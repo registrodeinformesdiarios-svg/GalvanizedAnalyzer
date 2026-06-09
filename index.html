@@ -1,0 +1,2289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>GausScope — Visualizador de Distribuciones Normales</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0b0f;
+    --bg2: #111218;
+    --bg3: #181921;
+    --bg4: #1e2029;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #f0f0f4;
+    --text2: #9a9baa;
+    --text3: #5a5b6a;
+    --accent: #c8f05a;
+    --accent2: #a3d43a;
+    --accent-glow: rgba(200,240,90,0.15);
+    --red: #ff5e5e;
+    --font-display: 'DM Serif Display', serif;
+    --font-ui: 'Syne', sans-serif;
+    --font-mono: 'DM Mono', monospace;
+    --r: 10px;
+    --r2: 14px;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    overflow-x: hidden;
+  }
+
+  /* LAYOUT */
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+  /* TOPBAR */
+  .topbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 0 28px;
+    height: 58px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .topbar-logo {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+    flex-shrink: 0;
+  }
+  .topbar-logo span { color: var(--text2); font-size: 13px; font-family: var(--font-mono); font-style: italic; margin-left: 6px; vertical-align: middle; }
+  .topbar-sep { flex: 1; }
+  .topbar-badge {
+    font-size: 11px; font-family: var(--font-mono);
+    background: var(--accent-glow); color: var(--accent);
+    border: 1px solid rgba(200,240,90,0.25);
+    padding: 3px 10px; border-radius: 20px;
+  }
+
+  /* MAIN GRID */
+  .main { display: grid; grid-template-columns: 320px 1fr; flex: 1; }
+
+  /* SIDEBAR */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    background: var(--bg2);
+    display: flex; flex-direction: column;
+    height: calc(100vh - 58px);
+    position: sticky; top: 58px;
+    overflow-y: auto;
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-track { background: transparent; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  .sidebar-section { padding: 20px 20px 0; }
+  .sidebar-section + .sidebar-section { border-top: 1px solid var(--border); margin-top: 20px; padding-top: 20px; }
+  .sidebar-label {
+    font-size: 10px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--text3); margin-bottom: 14px;
+  }
+
+  /* FORM */
+  .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .field label { font-size: 12px; color: var(--text2); font-weight: 500; }
+  .field input[type=text],
+  .field input[type=number] {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: var(--r);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    width: 100%;
+  }
+  .field input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+  .field input.error { border-color: var(--red); box-shadow: 0 0 0 3px rgba(255,94,94,0.12); }
+
+  .color-pick-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .color-dot {
+    width: 22px; height: 22px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.12s, border-color 0.12s;
+  }
+  .color-dot:hover { transform: scale(1.15); }
+  .color-dot.selected { border-color: var(--text); transform: scale(1.1); }
+
+  .btn-add {
+    width: 100%; padding: 11px; border-radius: var(--r);
+    background: var(--accent); color: #0a0b0f;
+    font-family: var(--font-ui); font-size: 13px; font-weight: 700;
+    border: none; cursor: pointer; letter-spacing: 0.3px;
+    transition: background 0.15s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin-bottom: 20px;
+  }
+  .btn-add:hover { background: var(--accent2); }
+  .btn-add:active { transform: scale(0.98); }
+
+  /* CURVE LIST */
+  .curves-list { display: flex; flex-direction: column; gap: 8px; padding: 0 20px 20px; }
+  .curve-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: var(--r2);
+    padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px;
+    transition: border-color 0.15s;
+    animation: slideIn 0.2s ease;
+  }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .curve-item:hover { border-color: var(--border2); }
+  .curve-swatch { width: 12px; height: 38px; border-radius: 4px; flex-shrink: 0; }
+  .curve-info { flex: 1; min-width: 0; }
+  .curve-name { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .curve-params { font-size: 11px; font-family: var(--font-mono); color: var(--text3); margin-top: 2px; }
+  .curve-params b { color: var(--text2); font-weight: 500; }
+  .btn-del {
+    background: none; border: none; cursor: pointer;
+    color: var(--text3); font-size: 18px; line-height: 1; padding: 2px 4px;
+    border-radius: 6px; transition: color 0.12s, background 0.12s;
+    flex-shrink: 0;
+  }
+  .btn-del:hover { color: var(--red); background: rgba(255,94,94,0.1); }
+
+  .curve-item { cursor: default; }
+  .curve-item.editing { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+  .curve-item .dbl-hint { font-size: 10px; color: var(--text3); margin-top: 3px; display: none; }
+  .curve-item:hover .dbl-hint { display: block; }
+  .curve-item.editing .dbl-hint { display: none; }
+
+  .edit-fields { display: flex; flex-direction: column; gap: 5px; flex: 1; }
+  .edit-row { display: flex; gap: 5px; align-items: center; }
+  .edit-row input[type=text],
+  .edit-row input[type=number] {
+    background: var(--bg4);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 5px 8px;
+    outline: none;
+    min-width: 0;
+  }
+  .edit-row input:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+  .edit-row input.e-name { flex: 1; }
+  .edit-row input.e-mu,
+  .edit-row input.e-sigma { width: 68px; flex-shrink: 0; }
+  .edit-row label { font-size: 10px; color: var(--text3); white-space: nowrap; }
+  .edit-actions { display: flex; gap: 5px; margin-top: 2px; }
+  .btn-save, .btn-cancel {
+    font-size: 11px; font-family: var(--font-ui); font-weight: 600;
+    border-radius: 6px; padding: 4px 10px; cursor: pointer; border: none;
+    transition: opacity 0.12s;
+  }
+  .btn-save { background: var(--accent); color: #0a0b0f; }
+  .btn-save:hover { opacity: 0.85; }
+  .btn-cancel { background: var(--bg4); color: var(--text2); border: 1px solid var(--border2); }
+  .btn-cancel:hover { color: var(--text); }
+
+  .edit-color-row { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-top: 1px; }
+  .edit-color-dot {
+    width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.1s, border-color 0.1s;
+    flex-shrink: 0;
+  }
+  .edit-color-dot:hover { transform: scale(1.2); }
+  .edit-color-dot.selected { border-color: #fff; transform: scale(1.15); }
+
+  .curves-empty {
+    text-align: center; color: var(--text3); font-size: 12px;
+    padding: 20px 20px 20px; line-height: 1.7;
+  }
+  .curves-empty span { display: block; font-size: 28px; margin-bottom: 8px; }
+
+  /* STATS TABLE */
+  .stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    padding: 0 20px 20px;
+  }
+  .stat-card {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 10px 12px;
+  }
+  .stat-label { font-size: 10px; color: var(--text3); letter-spacing: 0.8px; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { font-size: 18px; font-family: var(--font-mono); color: var(--text); font-weight: 500; }
+
+  /* CANVAS AREA */
+  .canvas-area {
+    padding: 28px 32px;
+    display: flex; flex-direction: column; gap: 24px;
+    min-height: calc(100vh - 58px);
+  }
+
+  /* CHART HEADER */
+  .chart-header { display: flex; align-items: flex-start; gap: 16px; }
+  .chart-title-wrap { flex: 1; }
+  .chart-title-label { font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text3); margin-bottom: 6px; font-weight: 600; }
+  .chart-title-input {
+    font-family: var(--font-display);
+    font-size: 28px;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid transparent;
+    outline: none;
+    width: 100%;
+    padding: 2px 0;
+    transition: border-color 0.15s;
+    letter-spacing: -0.3px;
+  }
+  .chart-title-input:focus { border-bottom-color: var(--accent); }
+  .chart-subtitle { font-size: 13px; color: var(--text3); margin-top: 4px; font-family: var(--font-mono); }
+
+  .chart-actions { display: flex; gap: 8px; flex-shrink: 0; margin-top: 22px; }
+  .btn-icon {
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--text2); border-radius: var(--r);
+    padding: 8px 14px; font-size: 12px; cursor: pointer;
+    font-family: var(--font-ui); font-weight: 500;
+    transition: background 0.12s, color 0.12s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-icon:hover { background: var(--bg4); color: var(--text); }
+
+  /* CHART BOX */
+  .chart-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px 28px;
+    flex: 1;
+    display: flex; flex-direction: column;
+  }
+  .chart-canvas-wrap { position: relative; width: 100%; height: 380px; }
+
+  /* LEGEND */
+  .legend-bar {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    margin-top: 16px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; }
+  .legend-line { width: 28px; height: 3px; border-radius: 2px; }
+  .legend-text { font-size: 12px; font-family: var(--font-mono); color: var(--text2); }
+  .legend-text strong { color: var(--text); font-weight: 500; }
+
+  /* FORMULA PANEL */
+  .formula-panel {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 18px; padding: 20px 24px;
+  }
+  .formula-title { font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--text3); font-weight: 600; margin-bottom: 12px; }
+  .formula-body {
+    font-family: var(--font-mono); font-size: 15px; color: var(--text2);
+    border-left: 3px solid var(--accent); padding-left: 16px;
+    line-height: 2;
+  }
+  .formula-body .hi { color: var(--accent); }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 14px 28px;
+    font-size: 11px; color: var(--text3);
+    font-family: var(--font-mono);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  /* TOOLTIP OVERRIDE */
+  .overlay-msg {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--red); color: #fff;
+    padding: 10px 20px; border-radius: 30px;
+    font-size: 13px; font-weight: 500;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 999;
+  }
+  .overlay-msg.show { opacity: 1; }
+
+  .lbl-toggle {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text3); cursor: pointer;
+    user-select: none; margin-top: 4px;
+  }
+  .lbl-toggle input[type=checkbox] { accent-color: var(--accent); width: 13px; height: 13px; cursor: pointer; }
+  .lbl-toggle:hover { color: var(--text2); }
+
+  .btn-hide {
+    background: none; border: none; cursor: pointer;
+    color: var(--text3); padding: 3px 5px; border-radius: 6px;
+    transition: color 0.12s, background 0.12s; flex-shrink: 0;
+    display: flex; align-items: center;
+  }
+  .btn-hide:hover { color: var(--text); background: var(--bg4); }
+  .curve-item.hidden-curve { opacity: 0.45; }
+  .curve-item.hidden-curve .curve-swatch { opacity: 0.3; }
+
+  /* JSON MODAL */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 500; backdrop-filter: blur(4px);
+    opacity: 0; pointer-events: none; transition: opacity 0.18s;
+  }
+  .modal-backdrop.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--bg2); border: 1px solid var(--border2);
+    border-radius: 18px; padding: 24px 26px; width: 520px; max-width: 95vw;
+    max-height: 90vh; display: flex; flex-direction: column; gap: 14px;
+    transform: translateY(12px); transition: transform 0.18s;
+  }
+  .modal-backdrop.open .modal { transform: translateY(0); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; }
+  .modal-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .modal-close {
+    background: none; border: none; cursor: pointer; color: var(--text3);
+    font-size: 20px; line-height: 1; padding: 2px 5px; border-radius: 6px;
+  }
+  .modal-close:hover { color: var(--text); background: var(--bg4); }
+  .modal-tabs { display: flex; gap: 4px; }
+  .modal-tab {
+    padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border2);
+    background: transparent; color: var(--text2); font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: var(--font-ui); transition: background 0.12s, color 0.12s;
+  }
+  .modal-tab.active { background: var(--accent); color: #0a0b0f; border-color: var(--accent); }
+  .modal-tab:not(.active):hover { background: var(--bg4); color: var(--text); }
+  .modal-panel { display: none; flex-direction: column; gap: 10px; }
+  .modal-panel.active { display: flex; }
+  .json-textarea {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--r);
+    color: var(--text); font-family: var(--font-mono); font-size: 12px;
+    padding: 12px; resize: vertical; min-height: 200px; outline: none;
+    line-height: 1.6;
+  }
+  .json-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+  .modal-hint { font-size: 11px; color: var(--text3); line-height: 1.6; }
+  .modal-hint code { background: var(--bg4); padding: 1px 5px; border-radius: 4px; color: var(--text2); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-modal-primary {
+    background: var(--accent); color: #0a0b0f; border: none;
+    padding: 9px 18px; border-radius: var(--r); font-size: 13px; font-weight: 700;
+    cursor: pointer; font-family: var(--font-ui); transition: opacity 0.12s;
+  }
+  .btn-modal-primary:hover { opacity: 0.85; }
+  .btn-modal-secondary {
+    background: var(--bg3); color: var(--text2); border: 1px solid var(--border2);
+    padding: 9px 18px; border-radius: var(--r); font-size: 13px; font-weight: 500;
+    cursor: pointer; font-family: var(--font-ui); transition: background 0.12s;
+  }
+  .btn-modal-secondary:hover { background: var(--bg4); color: var(--text); }
+
+  #gcChart { cursor: default; }
+  #gcChart.dragging { cursor: grabbing; }
+
+  /* CONFIDENCE LINES */
+  .conf-line-item {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: var(--r); padding: 8px 10px;
+    animation: slideIn 0.18s ease;
+  }
+  .conf-line-item:hover { border-color: var(--border2); }
+  .conf-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .conf-info { flex: 1; min-width: 0; }
+  .conf-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .conf-detail { font-size: 11px; font-family: var(--font-mono); color: var(--text3); margin-top: 1px; }
+  .conf-detail b { color: var(--text2); }
+  .btn-conf-del { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 16px; padding: 1px 4px; border-radius: 5px; transition: color 0.1s, background 0.1s; }
+  .btn-conf-del:hover { color: var(--red); background: rgba(255,94,94,0.1); }
+  .conf-result-box {
+    background: var(--bg4); border: 1px solid var(--border2); border-radius: var(--r);
+    padding: 10px 12px; display: none;
+  }
+  .conf-result-box.visible { display: block; }
+  .conf-result-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+  .conf-result-row:last-child { margin-bottom: 0; }
+  .conf-result-label { font-size: 11px; color: var(--text3); }
+  .conf-result-val { font-size: 13px; font-family: var(--font-mono); font-weight: 600; color: var(--accent); }
+  .conf-quick-btns { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 10px; }
+  .conf-quick-btn {
+    padding: 4px 9px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--border2); background: var(--bg3); color: var(--text2);
+    cursor: pointer; font-family: var(--font-mono); transition: background 0.1s, color 0.1s;
+  }
+  .conf-quick-btn:hover { background: var(--bg4); color: var(--text); }
+  .conf-type-row { display: flex; gap: 5px; margin-bottom: 10px; }
+  .conf-type-btn {
+    flex: 1; padding: 6px 0; border-radius: 7px; font-size: 11px; font-weight: 600;
+    border: 1px solid var(--border2); background: var(--bg3); color: var(--text2);
+    cursor: pointer; font-family: var(--font-ui); text-align: center; transition: background 0.1s, color 0.1s;
+  }
+  .conf-type-btn.active { background: var(--bg4); border-color: var(--accent); color: var(--accent); }
+  .conf-type-btn:hover:not(.active) { background: var(--bg4); color: var(--text); }
+
+  .dist-type-row { display: flex; gap: 5px; margin-bottom: 12px; }
+  .dist-type-btn {
+    flex: 1; padding: 7px 0; border-radius: 8px; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border2); background: var(--bg3); color: var(--text2);
+    cursor: pointer; font-family: var(--font-ui); text-align: center; transition: background 0.12s, color 0.12s, border-color 0.12s;
+  }
+  .dist-type-btn.active { background: var(--bg4); border-color: var(--accent); color: var(--accent); }
+  .dist-type-btn:hover:not(.active) { background: var(--bg4); color: var(--text); }
+  .dist-badge {
+    display: inline-block; font-size: 9px; font-family: var(--font-mono); font-weight: 600;
+    padding: 1px 5px; border-radius: 4px; vertical-align: middle; margin-left: 4px;
+    letter-spacing: 0.5px;
+  }
+  .dist-badge.normal { background: rgba(200,240,90,0.15); color: var(--accent); }
+  .dist-badge.lognormal { background: rgba(244,114,182,0.15); color: #f472b6; }
+
+  /* DATA MODAL */
+  .data-modal { width: 680px; }
+  .data-tabs { display: flex; gap: 4px; }
+  .data-tab {
+    padding: 6px 14px; border-radius: 8px; border: 1px solid var(--border2);
+    background: transparent; color: var(--text2); font-size: 12px; font-weight: 600;
+    cursor: pointer; font-family: var(--font-ui); transition: background 0.12s, color 0.12s;
+  }
+  .data-tab.active { background: var(--accent); color: #0a0b0f; border-color: var(--accent); }
+  .data-tab:hover:not(.active) { background: var(--bg4); color: var(--text); }
+  .data-panel { display: none; flex-direction: column; gap: 10px; }
+  .data-panel.active { display: flex; }
+  .paste-area {
+    background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--r);
+    color: var(--text); font-family: var(--font-mono); font-size: 12px;
+    padding: 12px; resize: vertical; min-height: 160px; outline: none; line-height: 1.7;
+  }
+  .paste-area:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
+  .data-stats-preview {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+  }
+  .data-stat-card {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 8px 10px;
+  }
+  .data-stat-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .8px; margin-bottom: 3px; }
+  .data-stat-val { font-size: 15px; font-family: var(--font-mono); color: var(--accent); font-weight: 500; }
+  .data-grid-wrap { max-height: 300px; overflow-y: auto; border-radius: var(--r); border: 1px solid var(--border2); }
+  .data-grid-wrap::-webkit-scrollbar { width: 4px; }
+  .data-grid-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+  .data-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+  .data-table th { background: var(--bg3); color: var(--text3); font-size: 10px; text-transform: uppercase; letter-spacing: .8px; padding: 8px 10px; text-align: left; position: sticky; top: 0; border-bottom: 1px solid var(--border2); }
+  .data-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text2); }
+  .data-table tr:last-child td { border-bottom: none; }
+  .data-table td input {
+    background: transparent; border: none; color: var(--text); font-family: var(--font-mono);
+    font-size: 12px; width: 100%; outline: none; padding: 0;
+  }
+  .data-table td input:focus { color: var(--accent); }
+  .data-table .td-del { width: 30px; text-align: center; }
+  .data-table .td-del button { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 14px; padding: 0; }
+  .data-table .td-del button:hover { color: var(--red); }
+  .data-warn { font-size: 11px; color: #fb923c; background: rgba(251,146,60,0.1); border: 1px solid rgba(251,146,60,0.25); border-radius: var(--r); padding: 8px 12px; display: none; }
+  .data-warn.show { display: block; }
+
+  /* RESPONSIVE */
+  @media (max-width: 820px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { position: static; height: auto; }
+    .canvas-area { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-logo">GausScope <span>v2.0</span></div>
+    <div class="topbar-sep"></div>
+    <div class="topbar-badge" id="curveCount">0 distribuciones</div>
+  </header>
+
+  <div class="main">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+      <!-- ADD FORM -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Nueva distribución</div>
+
+        <div class="field">
+          <label>Nombre de la muestra</label>
+          <input type="text" id="iName" placeholder="ej. Control, Grupo A…" />
+        </div>
+        <div class="field">
+          <label>Media (μ)</label>
+          <input type="number" id="iMu" value="0" step="0.1" />
+        </div>
+        <div class="field">
+          <label>Desviación estándar (σ)</label>
+          <input type="number" id="iSigma" value="1" step="0.1" min="0.01" />
+        </div>
+
+        <div class="sidebar-label" style="margin-top:14px">Tipo de distribución</div>
+        <div class="dist-type-row" id="distTypeRow">
+          <button class="dist-type-btn active" data-dist="normal">Normal</button>
+          <button class="dist-type-btn" data-dist="lognormal">Log-Normal</button>
+        </div>
+
+        <div class="sidebar-label" style="margin-top:14px">Color de la curva</div>
+        <div class="color-pick-row" id="colorPicker"></div>
+
+        <button class="btn-add" id="btnAdd">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Agregar campana
+        </button>
+        <button class="btn-add" id="btnOpenData" style="background:var(--bg3);color:var(--text);border:1px solid var(--border2);margin-top:-10px">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4 5h6M4 7.5h6M4 10h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          Desde datos (Excel)
+        </button>
+      </div>
+
+      <!-- TITLE EDIT SHORTCUT -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Título del gráfico</div>
+        <div class="field">
+          <input type="text" id="sTitleInput" placeholder="Escribe el título…" value="Comparación de distribuciones normales" />
+        </div>
+      </div>
+
+      <!-- CURVES LIST -->
+      <div class="sidebar-section" style="padding-bottom:0">
+        <div class="sidebar-label">Distribuciones activas</div>
+      </div>
+      <div class="curves-list" id="curvesList">
+        <div class="curves-empty"><span>∿</span>Agrega tu primera<br>distribución arriba.</div>
+      </div>
+
+      <!-- STATS -->
+      <div class="sidebar-section" id="statsSection" style="display:none">
+        <div class="sidebar-label">Estadísticas</div>
+      </div>
+      <div class="stats-grid" id="statsGrid" style="display:none"></div>
+
+      <!-- CONFIDENCE LINES -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Líneas de confianza</div>
+
+        <div class="field">
+          <label>Curva de referencia</label>
+          <select id="confCurveSelect" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
+            <option value="">— selecciona una curva —</option>
+          </select>
+        </div>
+
+        <div class="conf-type-row">
+          <button class="conf-type-btn active" id="confTypePct" data-type="pct">% confianza</button>
+          <button class="conf-type-btn" id="confTypeX" data-type="x">Valor de x</button>
+        </div>
+
+        <div id="confInputPct">
+          <div class="field">
+            <label>Porcentaje de confianza (%)</label>
+            <input type="number" id="confPct" value="95" min="0.1" max="99.9" step="0.1" />
+          </div>
+          <div class="field">
+            <label>Dirección</label>
+            <select id="confDir" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
+              <option value="right">Cola izquierda — P(X > x) = %</option>
+              <option value="left">Cola derecha — P(X &lt; x) = %</option>
+              <option value="two">Dos colas — intervalo central</option>
+            </select>
+          </div>
+          <div class="conf-quick-btns">
+            <button class="conf-quick-btn" data-pct="68.27">68%</button>
+            <button class="conf-quick-btn" data-pct="90">90%</button>
+            <button class="conf-quick-btn" data-pct="95">95%</button>
+            <button class="conf-quick-btn" data-pct="95.45">95.45%</button>
+            <button class="conf-quick-btn" data-pct="99">99%</button>
+            <button class="conf-quick-btn" data-pct="99.73">99.73%</button>
+          </div>
+        </div>
+
+        <div id="confInputX" style="display:none">
+          <div class="field">
+            <label>Valor de x</label>
+            <input type="number" id="confXval" value="0" step="0.01" />
+          </div>
+          <div class="field">
+            <label>Dirección</label>
+            <select id="confDirX" style="background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);color:var(--text);font-family:var(--font-mono);font-size:13px;padding:9px 12px;outline:none;width:100%">
+              <option value="right">P(X > x)</option>
+              <option value="left">P(X &lt; x)</option>
+              <option value="two">P(μ−|d| &lt; X &lt; μ+|d|)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="conf-result-box" id="confResultBox">
+          <div class="conf-result-row"><span class="conf-result-label">Valor de corte (x)</span><span class="conf-result-val" id="crX">—</span></div>
+          <div class="conf-result-row"><span class="conf-result-label">Porcentaje</span><span class="conf-result-val" id="crPct">—</span></div>
+          <div class="conf-result-row"><span class="conf-result-label">Desviaciones (z)</span><span class="conf-result-val" id="crZ">—</span></div>
+        </div>
+
+        <button class="btn-add" id="btnAddConfLine" style="margin-top:10px">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Agregar línea
+        </button>
+
+        <div style="display:flex;flex-direction:column;gap:6px;padding-bottom:16px" id="confLinesList"></div>
+      </div>
+
+    </aside>
+
+    <!-- CANVAS AREA -->
+    <main class="canvas-area">
+
+      <!-- HEADER -->
+      <div class="chart-header">
+        <div class="chart-title-wrap">
+          <div class="chart-title-label">Título del gráfico</div>
+          <input class="chart-title-input" id="chartTitleMain" type="text" value="Comparación de distribuciones normales" />
+          <div class="chart-subtitle" id="chartSubtitle">Sin datos — agrega una distribución para comenzar</div>
+        </div>
+        <div class="chart-actions">
+          <button class="btn-icon" id="btnJsonModal">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M4 4.5h5M4 6.5h5M4 8.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            JSON
+          </button>
+          <button class="btn-icon" id="btnClear">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M1 1l11 11M12 1L1 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            Limpiar
+          </button>
+          <button class="btn-icon" id="btnDownload">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 6.5l3.5 3.5 3.5-3.5M1 12h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            PNG
+          </button>
+        </div>
+      </div>
+
+      <!-- CHART -->
+      <div class="chart-box">
+        <div class="chart-canvas-wrap">
+          <canvas id="gcChart" role="img" aria-label="Gráfico de campanas de Gauss"></canvas>
+        </div>
+        <div class="legend-bar" id="legend"></div>
+      </div>
+
+      <!-- FORMULA -->
+      <div class="formula-panel">
+        <div class="formula-title">Funciones de densidad de probabilidad</div>
+        <div class="formula-body">
+          <span style="color:var(--text3);font-size:11px">Normal:</span><br>
+          f(x) = <span class="hi">1 / (σ√(2π))</span> · e<sup>−½((x−μ)/σ)²</sup>
+          <br><br>
+          <span style="color:var(--text3);font-size:11px">Log-Normal:</span><br>
+          f(x) = <span class="hi">1 / (xσ√(2π))</span> · e<sup>−½((ln x−μ)/σ)²</sup>
+          <br>
+          <span style="color:var(--text3); font-size:12px">
+            <span class="hi">μ</span> = media del log &nbsp;|&nbsp;
+            <span class="hi">σ</span> = desv. estándar del log &nbsp;|&nbsp;
+            <span class="hi">x</span> > 0
+          </span>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <span>GausScope — Visualizador de distribuciones normales</span>
+    <span id="footerInfo">—</span>
+  </footer>
+</div>
+
+<!-- DATA MODAL -->
+<div class="modal-backdrop" id="dataModal">
+  <div class="modal data-modal">
+    <div class="modal-header">
+      <span class="modal-title" id="dataModalTitle">Datos desde Excel</span>
+      <button class="modal-close" id="dataModalClose">×</button>
+    </div>
+
+    <div class="data-tabs">
+      <button class="data-tab active" data-dtab="paste">Pegar datos</button>
+      <button class="data-tab" data-dtab="edit">Editar datos</button>
+      <button class="data-tab" data-dtab="stats">Estadísticas</button>
+    </div>
+
+    <!-- PASTE PANEL -->
+    <div class="data-panel active" id="dpPaste">
+      <div class="modal-hint">Copia las celdas desde Excel (una o varias columnas/filas) y pégalas aquí. Se aceptan separadores por tabulación, coma, punto y coma o espacios.</div>
+      <textarea class="paste-area" id="dataPasteArea" placeholder="Pega aquí los datos copiados de Excel…&#10;&#10;Ejemplo:&#10;12.5&#9;13.1&#9;11.8&#10;14.2&#9;12.9&#9;13.7"></textarea>
+      <div class="data-warn" id="dataPasteWarn"></div>
+      <div class="data-stats-preview" id="dataPastePreview" style="display:none">
+        <div class="data-stat-card"><div class="data-stat-label">N</div><div class="data-stat-val" id="dpN">—</div></div>
+        <div class="data-stat-card"><div class="data-stat-label">Media</div><div class="data-stat-val" id="dpMean">—</div></div>
+        <div class="data-stat-card"><div class="data-stat-label">Desv. Est.</div><div class="data-stat-val" id="dpStd">—</div></div>
+        <div class="data-stat-card"><div class="data-stat-label">Tipo</div><div class="data-stat-val" id="dpType">—</div></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-modal-secondary" id="btnDataClear">Limpiar</button>
+        <button class="btn-modal-primary" id="btnDataParse">Analizar →</button>
+      </div>
+    </div>
+
+    <!-- EDIT PANEL -->
+    <div class="data-panel" id="dpEdit">
+      <div class="modal-hint">Edita los valores individualmente o agrega/elimina filas. Los cambios recalculan μ y σ automáticamente.</div>
+      <div class="data-grid-wrap">
+        <table class="data-table" id="dataEditTable">
+          <thead><tr><th>#</th><th>Valor</th><th>ln(x)</th><th></th></tr></thead>
+          <tbody id="dataEditBody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn-modal-secondary" id="btnAddDataRow" style="font-size:12px;padding:7px 12px">+ Agregar fila</button>
+        <div class="data-stats-preview" style="flex:1;grid-template-columns:repeat(3,1fr)">
+          <div class="data-stat-card"><div class="data-stat-label">Media (μ)</div><div class="data-stat-val" id="deMean">—</div></div>
+          <div class="data-stat-card"><div class="data-stat-label">Desv. Est. (σ)</div><div class="data-stat-val" id="deStd">—</div></div>
+          <div class="data-stat-card"><div class="data-stat-label">N</div><div class="data-stat-val" id="deN">—</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATS PANEL -->
+    <div class="data-panel" id="dpStats">
+      <div class="data-stats-preview" style="grid-template-columns:repeat(3,1fr);gap:8px" id="dsFullStats"></div>
+      <div class="data-warn" id="dsLognormWarn"></div>
+    </div>
+
+    <div class="modal-actions" style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+      <div style="flex:1;display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--text3)">Tipo:</span>
+        <button class="dist-type-btn active" id="ddNormal" style="padding:5px 12px;font-size:11px">Normal</button>
+        <button class="dist-type-btn" id="ddLogNormal" style="padding:5px 12px;font-size:11px">Log-Normal</button>
+      </div>
+      <button class="btn-modal-secondary" id="btnDataCancel">Cancelar</button>
+      <button class="btn-modal-primary" id="btnDataApply">Agregar campana</button>
+    </div>
+  </div>
+</div>
+
+<!-- JSON MODAL -->
+<div class="modal-backdrop" id="jsonModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Exportar / Importar JSON</span>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab active" data-tab="export">Exportar</button>
+      <button class="modal-tab" data-tab="import">Importar</button>
+    </div>
+
+    <!-- EXPORT PANEL -->
+    <div class="modal-panel active" id="panelExport">
+      <div class="modal-hint">Copia el JSON o descárgalo como archivo <code>.json</code>.</div>
+      <textarea class="json-textarea" id="jsonExportArea" readonly></textarea>
+      <div class="modal-actions">
+        <button class="btn-modal-secondary" id="btnCopyJson">Copiar</button>
+        <button class="btn-modal-primary" id="btnDownloadJson">Descargar .json</button>
+      </div>
+    </div>
+
+    <!-- IMPORT PANEL -->
+    <div class="modal-panel" id="panelImport">
+      <div class="modal-hint">
+        Pega un JSON exportado previamente o arrastra un archivo <code>.json</code> aquí.<br>
+        Formato esperado: array de objetos con <code>name</code>, <code>mu</code>, <code>sigma</code>, <code>color</code>.
+      </div>
+      <textarea class="json-textarea" id="jsonImportArea" placeholder='[{"name":"Muestra A","mu":0,"sigma":1,"color":"#c8f05a"}]'></textarea>
+      <div class="modal-actions">
+        <button class="btn-modal-secondary" id="btnImportFile">
+          <input type="file" id="fileInput" accept=".json" style="display:none" />
+          Cargar archivo
+        </button>
+        <button class="btn-modal-secondary" id="modalCancel">Cancelar</button>
+        <button class="btn-modal-primary" id="btnApplyImport">Importar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="overlay-msg" id="toast"></div>
+
+<script>
+// ─── PALETTE ───────────────────────────────────────────────────────────────
+const PALETTE = [
+  '#c8f05a','#4fc3f7','#ff7043','#ce93d8','#ffcc02',
+  '#80cbc4','#ff8a65','#a5d6a7','#ef9a9a','#90caf9'
+];
+let selectedColor = PALETTE[0];
+let curves = [];
+let chart = null;
+let sampleCounter = 1;
+
+// ─── DRAGGABLE LABEL PLUGIN ────────────────────────────────────────────────
+const labelPlugin = {
+  id: 'draggableLabels',
+  afterDraw(chartInst) {
+    const ctx = chartInst.ctx;
+    const xScale = chartInst.scales.x;
+    const yScale = chartInst.scales.y;
+
+    curves.forEach((c, i) => {
+      if (!c.showLabel || c.hidden) return;
+
+      // default position: peak of the curve
+      if (c.labelX === undefined) {
+        const peak = curvePeak(c);
+        c.labelX = peak.x;
+        c.labelY = peak.y * 0.82;
+      }
+
+      const px = xScale.getPixelForValue(c.labelX);
+      const py = yScale.getPixelForValue(c.labelY);
+
+      const text = c.name;
+      ctx.save();
+      ctx.font = '500 12px "Syne", sans-serif';
+      const tw = ctx.measureText(text).width;
+      const pad = 7; const ph = 8;
+      const bw = tw + pad * 2; const bh = 20 + ph;
+
+      // pill background
+      ctx.beginPath();
+      ctx.roundRect(px - bw/2, py - bh/2, bw, bh, 6);
+      ctx.fillStyle = hexToRgba(c.color, 0.18);
+      ctx.fill();
+      ctx.strokeStyle = c.color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // text
+      ctx.fillStyle = c.color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, px, py);
+
+      // drag handle dots
+      ctx.fillStyle = hexToRgba(c.color, 0.55);
+      [-4, 0, 4].forEach(dx => {
+        ctx.beginPath();
+        ctx.arc(px + dx, py + bh/2 - 4, 1.5, 0, Math.PI*2);
+        ctx.fill();
+      });
+
+      ctx.restore();
+    });
+  }
+};
+
+// ─── DRAG STATE ────────────────────────────────────────────────────────────
+let drag = null;
+
+function getLabelHit(chartInst, mx, my) {
+  const xScale = chartInst.scales.x;
+  const yScale = chartInst.scales.y;
+  // Check curve name labels
+  for (let i = curves.length - 1; i >= 0; i--) {
+    const c = curves[i];
+    if (!c.showLabel || c.labelX === undefined) continue;
+    const px = xScale.getPixelForValue(c.labelX);
+    const py = yScale.getPixelForValue(c.labelY);
+    const ctx = chartInst.ctx;
+    ctx.font = '500 12px "Syne", sans-serif';
+    const tw = ctx.measureText(c.name).width;
+    const bw = tw + 14; const bh = 28;
+    if (mx >= px - bw/2 && mx <= px + bw/2 && my >= py - bh/2 && my <= py + bh/2)
+      return { type: 'curve', idx: i };
+  }
+  // Check conf line labels
+  for (let li = confLines.length - 1; li >= 0; li--) {
+    const l = confLines[li];
+    if (!l._labels) continue;
+    for (let si = l._labels.length - 1; si >= 0; si--) {
+      const slot = l._labels[si];
+      if (slot.cx === undefined) continue;
+      if (mx >= slot.cx - slot.hw && mx <= slot.cx + slot.hw &&
+          my >= slot.cy - slot.hh && my <= slot.cy + slot.hh)
+        return { type: 'conf', lineIdx: li, subIdx: si };
+    }
+  }
+  return null;
+}
+
+function setupDrag() {
+  const canvas = document.getElementById('gcChart');
+
+  canvas.addEventListener('mousedown', e => {
+    if (!chart) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const hit = getLabelHit(chart, mx, my);
+    if (!hit) return;
+    if (hit.type === 'curve') {
+      drag = { type: 'curve', idx: hit.idx, startMx: mx, startMy: my,
+        startLX: curves[hit.idx].labelX, startLY: curves[hit.idx].labelY };
+    } else {
+      const slot = confLines[hit.lineIdx]._labels[hit.subIdx];
+      drag = { type: 'conf', lineIdx: hit.lineIdx, subIdx: hit.subIdx,
+        startMx: mx, startMy: my,
+        startPx: slot.userPx !== null ? slot.userPx : slot.autoPx,
+        startPy: slot.userPy !== null ? slot.userPy : slot.autoPy };
+    }
+    canvas.classList.add('dragging');
+    e.preventDefault();
+  });
+
+  window.addEventListener('mousemove', e => {
+    if (!drag || !chart) return;
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const dx = mx - drag.startMx;
+    const dy = my - drag.startMy;
+
+    if (drag.type === 'curve') {
+      const xScale = chart.scales.x;
+      const yScale = chart.scales.y;
+      const dxVal = xScale.getValueForPixel(mx) - xScale.getValueForPixel(drag.startMx);
+      const dyVal = yScale.getValueForPixel(my) - yScale.getValueForPixel(drag.startMy);
+      curves[drag.idx].labelX = drag.startLX + dxVal;
+      curves[drag.idx].labelY = drag.startLY + dyVal;
+    } else {
+      const slot = confLines[drag.lineIdx]._labels[drag.subIdx];
+      slot.userPx = drag.startPx + dx;
+      slot.userPy = drag.startPy + dy;
+    }
+    chart.draw();
+
+    const hit = getLabelHit(chart, mx, my);
+    canvas.style.cursor = hit ? 'grab' : 'default';
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (drag) { drag = null; canvas.classList.remove('dragging'); }
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (drag || !chart) return;
+    const rect = canvas.getBoundingClientRect();
+    const hit = getLabelHit(chart, e.clientX - rect.left, e.clientY - rect.top);
+    canvas.style.cursor = hit ? 'grab' : 'default';
+  });
+}
+
+// ─── COLOR PICKER ──────────────────────────────────────────────────────────
+function buildColorPicker() {
+  const el = document.getElementById('colorPicker');
+  el.innerHTML = '';
+  PALETTE.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'color-dot' + (c === selectedColor ? ' selected' : '');
+    d.style.background = c;
+    d.title = c;
+    d.addEventListener('click', () => {
+      selectedColor = c;
+      document.querySelectorAll('.color-dot').forEach(x => x.classList.remove('selected'));
+      d.classList.add('selected');
+    });
+    el.appendChild(d);
+  });
+}
+buildColorPicker();
+
+// ─── MATH ──────────────────────────────────────────────────────────────────
+function normalPDF(x, mu, sigma) {
+  return (1 / (sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((x - mu) / sigma, 2));
+}
+
+function logNormalPDF(x, mu, sigma) {
+  // mu and sigma are the mean and std of the underlying normal (ln(X) ~ N(mu, sigma))
+  if (x <= 0) return 0;
+  return (1 / (x * sigma * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * Math.pow((Math.log(x) - mu) / sigma, 2));
+}
+
+function curvePDF(x, c) {
+  return c.dist === 'lognormal' ? logNormalPDF(x, c.mu, c.sigma) : normalPDF(x, c.mu, c.sigma);
+}
+
+function curvePeak(c) {
+  // Returns x at peak and peak y value
+  if (c.dist === 'lognormal') {
+    const xPeak = Math.exp(c.mu - c.sigma * c.sigma);
+    return { x: xPeak, y: logNormalPDF(xPeak, c.mu, c.sigma) };
+  }
+  return { x: c.mu, y: normalPDF(c.mu, c.mu, c.sigma) };
+}
+
+function getCurveXRange(c) {
+  if (c.dist === 'lognormal') {
+    // For log-normal: range from near 0 to exp(mu + 4.5*sigma)
+    const lo = Math.max(0.001, Math.exp(c.mu - 4.2 * c.sigma));
+    const hi = Math.exp(c.mu + 4.2 * c.sigma);
+    return { lo, hi };
+  }
+  return { lo: c.mu - 4.2 * c.sigma, hi: c.mu + 4.2 * c.sigma };
+}
+
+function getXRange() {
+  const visible = curves.filter(c => !c.hidden);
+  if (!visible.length) return { min: -5, max: 5 };
+  let lo = Math.min(...visible.map(c => getCurveXRange(c).lo));
+  let hi = Math.max(...visible.map(c => getCurveXRange(c).hi));
+  const pad = (hi - lo) * 0.06;
+  return { min: lo - pad, max: hi + pad };
+}
+
+function hexToRgba(hex, a) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ─── CHART ─────────────────────────────────────────────────────────────────
+function buildDatasets() {
+  const { min, max } = getXRange();
+  const N = 400;
+  const step = (max - min) / N;
+  const xs = Array.from({length: N+1}, (_, i) => min + i * step);
+
+  return curves.filter(c => !c.hidden).map(c => ({
+    label: c.name,
+    data: xs.map(x => ({x, y: curvePDF(x, c)})),
+    borderColor: c.color,
+    backgroundColor: hexToRgba(c.color, 0.08),
+    borderWidth: 2.2,
+    pointRadius: 0,
+    pointHoverRadius: 0,
+    fill: true,
+    tension: 0.4,
+  }));
+}
+
+function renderChart() {
+  const ctx = document.getElementById('gcChart').getContext('2d');
+  const title = document.getElementById('chartTitleMain').value || 'Distribuciones normales';
+  const ds = buildDatasets();
+
+  if (chart) {
+    const { min, max } = getXRange();
+    chart.data.datasets = ds;
+    chart.options.plugins.title.text = title;
+    chart.options.scales.x.min = min;
+    chart.options.scales.x.max = max;
+    chart.update('active');
+  } else {
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: { datasets: ds },
+      plugins: [labelPlugin, confPlugin],
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        parsing: false,
+        animation: { duration: 350, easing: 'easeOutQuart' },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: false
+          },
+          tooltip: {
+            backgroundColor: '#1e2029',
+            borderColor: 'rgba(255,255,255,0.1)',
+            borderWidth: 1,
+            titleColor: '#f0f0f4',
+            bodyColor: '#9a9baa',
+            titleFont: { family: 'DM Mono', size: 12 },
+            bodyFont: { family: 'DM Mono', size: 11 },
+            padding: 10,
+            callbacks: {
+              title: items => `x = ${parseFloat(items[0].label).toFixed(3)}`,
+              label: item => ` ${item.dataset.label}: ${item.parsed.y.toFixed(5)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            type: 'linear',
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            border: { color: 'rgba(255,255,255,0.08)' },
+            ticks: {
+              color: '#5a5b6a',
+              font: { family: 'DM Mono', size: 11 },
+              maxTicksLimit: 12,
+              callback: v => v.toFixed(1)
+            },
+            title: { display: true, text: 'x', color: '#5a5b6a', font: { family: 'DM Mono', size: 12 } }
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            border: { color: 'rgba(255,255,255,0.08)' },
+            ticks: {
+              color: '#5a5b6a',
+              font: { family: 'DM Mono', size: 11 },
+              callback: v => v.toFixed(3)
+            },
+            beginAtZero: true,
+            title: { display: true, text: 'f(x)', color: '#5a5b6a', font: { family: 'DM Mono', size: 12 } }
+          }
+        }
+      }
+    });
+    setupDrag();
+  }
+
+  renderLegend();
+  updateSubtitle();
+  updateStats();
+  updateCount();
+  updateConfCurveSelect();
+}
+
+function renderLegend() {
+  const el = document.getElementById('legend');
+  if (!curves.length) { el.innerHTML = ''; return; }
+  el.innerHTML = curves.map(c => `
+    <div class="legend-item">
+      <div class="legend-line" style="background:${c.color}"></div>
+      <div class="legend-text"><strong>${c.name}</strong> &nbsp; μ=${c.mu} &nbsp; σ=${c.sigma}</div>
+    </div>`).join('');
+}
+
+function updateSubtitle() {
+  const el = document.getElementById('chartSubtitle');
+  if (!curves.length) { el.textContent = 'Sin datos — agrega una distribución para comenzar'; return; }
+  const n = curves.length;
+  el.textContent = `${n} distribución${n>1?'es':''} activa${n>1?'s':''}`;
+}
+
+function updateStats() {
+  const ss = document.getElementById('statsSection');
+  const sg = document.getElementById('statsGrid');
+  if (!curves.length) { ss.style.display = 'none'; sg.style.display = 'none'; return; }
+  ss.style.display = '';
+  sg.style.display = 'grid';
+  const mus = curves.map(c => c.mu);
+  const sigs = curves.map(c => c.sigma);
+  const minMu = Math.min(...mus).toFixed(2);
+  const maxMu = Math.max(...mus).toFixed(2);
+  const minSig = Math.min(...sigs).toFixed(2);
+  const maxSig = Math.max(...sigs).toFixed(2);
+  sg.innerHTML = `
+    <div class="stat-card"><div class="stat-label">μ mínima</div><div class="stat-val">${minMu}</div></div>
+    <div class="stat-card"><div class="stat-label">μ máxima</div><div class="stat-val">${maxMu}</div></div>
+    <div class="stat-card"><div class="stat-label">σ mínima</div><div class="stat-val">${minSig}</div></div>
+    <div class="stat-card"><div class="stat-label">σ máxima</div><div class="stat-val">${maxSig}</div></div>`;
+}
+
+function updateCount() {
+  const n = curves.length;
+  document.getElementById('curveCount').textContent = `${n} distribución${n!==1?'es':''}`;
+  document.getElementById('footerInfo').textContent = n
+    ? `Curvas: ${curves.map(c=>c.name).join(' · ')}`
+    : '—';
+}
+
+// ─── CURVE LIST ────────────────────────────────────────────────────────────
+function renderList() {
+  const el = document.getElementById('curvesList');
+  if (!curves.length) {
+    el.innerHTML = '<div class="curves-empty"><span>∿</span>Agrega tu primera<br>distribución arriba.</div>';
+    return;
+  }
+
+  el.innerHTML = curves.map((c, i) => `
+    <div class="curve-item${c.hidden ? ' hidden-curve' : ''}" data-i="${i}">
+      <div class="curve-swatch" style="background:${c.color}"></div>
+      <div class="curve-info">
+        <div class="curve-name">${c.name} <span class="dist-badge ${c.dist||'normal'}">${c.dist === 'lognormal' ? 'LOG-N' : 'N'}</span></div>
+        <div class="curve-params">μ = <b>${c.mu}</b> &nbsp; σ = <b>${c.sigma}</b> &nbsp; σ² = <b>${(c.sigma*c.sigma).toFixed(3)}</b></div>
+        <label class="lbl-toggle">
+          <input type="checkbox" class="chk-label" data-i="${i}" ${c.showLabel ? 'checked' : ''} />
+          Mostrar etiqueta en gráfico
+        </label>
+        ${c.rawData && c.rawData.length ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">
+          <span style="color:var(--accent)">${c.rawData.length}</span> valores · 
+          <button class="btn-edit-data" data-i="${i}" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:10px;padding:0;text-decoration:underline">editar datos</button>
+        </div>` : ''}
+        <div class="dbl-hint">Doble clic para editar</div>
+      </div>
+      <button class="btn-hide" data-i="${i}" title="${c.hidden ? 'Mostrar curva' : 'Ocultar curva'}" aria-label="${c.hidden ? 'Mostrar' : 'Ocultar'}">
+        ${c.hidden
+          ? `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M1 1l13 13M6.2 4.3A5 5 0 0 1 7.5 4c3 0 5.5 2.5 6 3.5-.3.6-1 1.6-2 2.4M3.5 5.5C2.5 6.3 1.8 7.1 1.5 7.5c.5 1 3 3.5 6 3.5a5 5 0 0 0 2.3-.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`
+          : `<svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 4C4.5 4 2 6.5 1.5 7.5 2 8.5 4.5 11 7.5 11S13 8.5 13.5 7.5C13 6.5 10.5 4 7.5 4Z" stroke="currentColor" stroke-width="1.4"/><circle cx="7.5" cy="7.5" r="2" stroke="currentColor" stroke-width="1.4"/></svg>`
+        }
+      </button>
+      <button class="btn-del" data-i="${i}" title="Eliminar">×</button>
+    </div>`).join('');
+
+  el.querySelectorAll('.btn-hide').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = +btn.dataset.i;
+      curves[i].hidden = !curves[i].hidden;
+      renderList();
+      renderChart();
+    });
+  });
+
+  el.querySelectorAll('.btn-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      curves.splice(+btn.dataset.i, 1);
+      renderList();
+      renderChart();
+    });
+  });
+
+  el.querySelectorAll('.chk-label').forEach(chk => {
+    chk.addEventListener('change', () => {
+      curves[+chk.dataset.i].showLabel = chk.checked;
+      renderChart();
+    });
+  });
+
+  el.querySelectorAll('.btn-edit-data').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openDataModal(+btn.dataset.i);
+    });
+  });
+
+  el.querySelectorAll('.curve-item').forEach(item => {
+    item.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.btn-del')) return;
+      openInlineEdit(item, +item.dataset.i);
+    });
+  });
+}
+
+function openInlineEdit(item, idx) {
+  if (item.classList.contains('editing')) return;
+  item.classList.add('editing');
+  const c = curves[idx];
+  let editColor = c.color;
+  let editDist = c.dist || 'normal';
+
+  const swatch = item.querySelector('.curve-swatch');
+
+  const info = item.querySelector('.curve-info');
+  info.innerHTML = `
+    <div class="edit-fields">
+      <div class="edit-row">
+        <input class="e-name" type="text" value="${c.name}" placeholder="Nombre" title="Nombre" />
+      </div>
+      <div class="edit-row">
+        <label>μ</label>
+        <input class="e-mu" type="number" value="${c.mu}" step="0.1" title="Media" />
+        <label>σ</label>
+        <input class="e-sigma" type="number" value="${c.sigma}" step="0.1" min="0.01" title="Desviación estándar" />
+      </div>
+      <div class="edit-color-row" id="editColorRow"></div>
+      <div style="display:flex;gap:5px;margin-top:4px" id="editDistRow">
+        <button class="dist-type-btn${editDist==='normal'?' active':''}" data-dist="normal" style="flex:1;padding:5px 0;font-size:11px">Normal</button>
+        <button class="dist-type-btn${editDist==='lognormal'?' active':''}" data-dist="lognormal" style="flex:1;padding:5px 0;font-size:11px">Log-Normal</button>
+      </div>
+      <div class="edit-actions">
+        <button class="btn-save">Guardar</button>
+        <button class="btn-cancel">Cancelar</button>
+      </div>
+    </div>`;
+
+  // build inline color picker
+  const colorRow = info.querySelector('#editColorRow');
+  PALETTE.forEach(col => {
+    const d = document.createElement('div');
+    d.className = 'edit-color-dot' + (col === editColor ? ' selected' : '');
+    d.style.background = col;
+    d.title = col;
+    d.addEventListener('click', () => {
+      editColor = col;
+      colorRow.querySelectorAll('.edit-color-dot').forEach(x => x.classList.remove('selected'));
+      d.classList.add('selected');
+      swatch.style.background = col;
+    });
+    colorRow.appendChild(d);
+  });
+
+  // dist toggle
+  info.querySelectorAll('#editDistRow .dist-type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      editDist = btn.dataset.dist;
+      info.querySelectorAll('#editDistRow .dist-type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  const eName   = info.querySelector('.e-name');
+  const eMu     = info.querySelector('.e-mu');
+  const eSigma  = info.querySelector('.e-sigma');
+  eName.focus();
+  eName.select();
+
+  function save() {
+    const newMu    = parseFloat(eMu.value);
+    const newSigma = parseFloat(eSigma.value);
+    const newName  = eName.value.trim() || c.name;
+    if (isNaN(newMu) || isNaN(newSigma) || newSigma <= 0) {
+      eSigma.style.borderColor = 'var(--red)';
+      showToast('σ debe ser un número mayor que 0');
+      setTimeout(() => eSigma.style.borderColor = '', 1800);
+      return;
+    }
+    curves[idx] = { ...c, name: newName, mu: +newMu.toFixed(4), sigma: +newSigma.toFixed(4), color: editColor, dist: editDist,
+      showLabel: c.showLabel, labelX: undefined, labelY: undefined };
+    renderList();
+    renderChart();
+  }
+
+  info.querySelector('.btn-save').addEventListener('click', save);
+  info.querySelector('.btn-cancel').addEventListener('click', () => { renderList(); });
+
+  [eName, eMu, eSigma].forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') save();
+      if (e.key === 'Escape') { renderList(); }
+    });
+  });
+}
+
+renderList();
+
+// ─── DIST TYPE TOGGLE ─────────────────────────────────────────────────────
+let selectedDist = 'normal';
+document.querySelectorAll('#distTypeRow .dist-type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    selectedDist = btn.dataset.dist;
+    document.querySelectorAll('#distTypeRow .dist-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+// ─── ADD ───────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+document.getElementById('btnAdd').addEventListener('click', () => {
+  const mu = parseFloat(document.getElementById('iMu').value);
+  const sigma = parseFloat(document.getElementById('iSigma').value);
+  const name = document.getElementById('iName').value.trim() ||
+    `Muestra ${String.fromCharCode(64 + sampleCounter)}`;
+
+  const sigEl = document.getElementById('iSigma');
+  if (isNaN(mu) || isNaN(sigma) || sigma <= 0) {
+    sigEl.classList.add('error');
+    showToast('σ debe ser un número mayor que 0');
+    setTimeout(() => sigEl.classList.remove('error'), 2000);
+    return;
+  }
+
+  curves.push({ mu: +mu.toFixed(4), sigma: +sigma.toFixed(4), name, color: selectedColor, dist: selectedDist });
+  sampleCounter++;
+  document.getElementById('iName').value = '';
+
+  // auto-advance color
+  const idx = PALETTE.indexOf(selectedColor);
+  selectedColor = PALETTE[(idx + 1) % PALETTE.length];
+  buildColorPicker();
+
+  renderList();
+  renderChart();
+});
+
+// Enter key support
+['iName','iMu','iSigma'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btnAdd').click();
+  });
+});
+
+// ─── TITLE SYNC ────────────────────────────────────────────────────────────
+function syncTitle(val) {
+  document.getElementById('chartTitleMain').value = val;
+  document.getElementById('sTitleInput').value = val;
+  if (chart) { chart.options.plugins.title.text = val; chart.update(); }
+}
+document.getElementById('chartTitleMain').addEventListener('input', e => syncTitle(e.target.value));
+document.getElementById('sTitleInput').addEventListener('input', e => syncTitle(e.target.value));
+
+// ─── CLEAR ─────────────────────────────────────────────────────────────────
+document.getElementById('btnClear').addEventListener('click', () => {
+  if (!curves.length) return;
+  curves = [];
+  sampleCounter = 1;
+  selectedColor = PALETTE[0];
+  buildColorPicker();
+  renderList();
+  renderChart();
+});
+
+// ─── EXPORT ────────────────────────────────────────────────────────────────
+document.getElementById('btnDownload').addEventListener('click', () => {
+  if (!chart) return;
+  const a = document.createElement('a');
+  a.download = 'gausscope.png';
+  a.href = document.getElementById('gcChart').toDataURL('image/png');
+  a.click();
+});
+
+// ─── CONFIDENCE LINES ──────────────────────────────────────────────────────
+let confLines = [];
+const CONF_COLORS = ['#facc15','#f472b6','#34d399','#a78bfa','#fb923c','#60a5fa'];
+let confColorIdx = 0;
+
+// Error function approximation (Abramowitz & Stegun)
+function erf(x) {
+  const t = 1 / (1 + 0.3275911 * Math.abs(x));
+  const poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+  const result = 1 - poly * Math.exp(-x * x);
+  return x >= 0 ? result : -result;
+}
+function normalCDF(x, mu, sigma) { return 0.5 * (1 + erf((x - mu) / (sigma * Math.SQRT2))); }
+// Inverse CDF (rational approximation)
+function invNormalCDF(p) {
+  if (p <= 0) return -Infinity; if (p >= 1) return Infinity;
+  const a = [-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.383577518672690e2, -3.066479806614716e1, 2.506628277459239];
+  const b = [-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1];
+  const c = [-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783];
+  const d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996, 3.754408661907416];
+  const pLow = 0.02425, pHigh = 1 - pLow;
+  let q, r;
+  if (p < pLow) {
+    q = Math.sqrt(-2 * Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  } else if (p <= pHigh) {
+    q = p - 0.5; r = q*q;
+    return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+  } else {
+    q = Math.sqrt(-2 * Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+  }
+}
+
+function computeConfFromPct(mu, sigma, pct, dir, dist) {
+  const p = pct / 100;
+  const isLN = dist === 'lognormal';
+  if (dir === 'right') {
+    // P(X > x) = p  →  P(X < x) = 1-p
+    const zVal = mu + sigma * invNormalCDF(1 - p);
+    const x = isLN ? Math.exp(zVal) : zVal;
+    return { x1: x, x2: null, pct, dir };
+  } else if (dir === 'left') {
+    const zVal = mu + sigma * invNormalCDF(p);
+    const x = isLN ? Math.exp(zVal) : zVal;
+    return { x1: x, x2: null, pct, dir };
+  } else {
+    const z1 = mu + sigma * invNormalCDF((1 - p) / 2);
+    const z2 = mu + sigma * invNormalCDF((1 + p) / 2);
+    return { x1: isLN ? Math.exp(z1) : z1, x2: isLN ? Math.exp(z2) : z2, pct, dir };
+  }
+}
+
+function computeConfFromX(mu, sigma, xval, dir, dist) {
+  const isLN = dist === 'lognormal';
+  // For lognormal: CDF(x) = Φ((ln(x) - mu) / sigma)
+  // We work in log-space for the CDF computation
+  const cdfAt = (v) => isLN
+    ? (v <= 0 ? 0 : normalCDF(Math.log(v), mu, sigma))
+    : normalCDF(v, mu, sigma);
+
+  if (dir === 'right') {
+    const pct = (1 - cdfAt(xval)) * 100;
+    return { x1: xval, x2: null, pct, dir };
+  } else if (dir === 'left') {
+    const pct = cdfAt(xval) * 100;
+    return { x1: xval, x2: null, pct, dir };
+  } else {
+    if (isLN) {
+      // symmetric in log-space around mu
+      const d = Math.abs(Math.log(Math.max(xval, 1e-10)) - mu);
+      const x1 = Math.exp(mu - d);
+      const x2 = Math.exp(mu + d);
+      const pct = (cdfAt(x2) - cdfAt(x1)) * 100;
+      return { x1, x2, pct, dir };
+    } else {
+      const d = Math.abs(xval - mu);
+      const x1 = mu - d, x2 = mu + d;
+      const pct = (cdfAt(x2) - cdfAt(x1)) * 100;
+      return { x1, x2, pct, dir };
+    }
+  }
+}
+
+// Update live result preview
+function updateConfPreview() {
+  const box = document.getElementById('confResultBox');
+  const idx = parseInt(document.getElementById('confCurveSelect').value);
+  if (isNaN(idx) || !curves[idx]) { box.classList.remove('visible'); return; }
+  const c = curves[idx];
+  const dist = c.dist || 'normal';
+  const isLN = dist === 'lognormal';
+  const mode = document.querySelector('.conf-type-btn.active').dataset.type;
+  let result;
+  if (mode === 'pct') {
+    const pct = parseFloat(document.getElementById('confPct').value);
+    const dir = document.getElementById('confDir').value;
+    if (isNaN(pct)) { box.classList.remove('visible'); return; }
+    result = computeConfFromPct(c.mu, c.sigma, pct, dir, dist);
+  } else {
+    const xval = parseFloat(document.getElementById('confXval').value);
+    const dir = document.getElementById('confDirX').value;
+    if (isNaN(xval)) { box.classList.remove('visible'); return; }
+    result = computeConfFromX(c.mu, c.sigma, xval, dir, dist);
+  }
+  box.classList.add('visible');
+  const xStr = result.x2 !== null
+    ? `[${result.x1.toFixed(4)}, ${result.x2.toFixed(4)}]`
+    : result.x1.toFixed(4);
+  document.getElementById('crX').textContent = xStr;
+  document.getElementById('crPct').textContent = result.pct.toFixed(4) + '%';
+  // z: for lognormal, z = (ln(x) - mu) / sigma; for normal, z = (x - mu) / sigma
+  let zStr;
+  if (result.x2 !== null) {
+    const zHalf = isLN
+      ? ((Math.log(result.x2) - c.mu) / c.sigma).toFixed(4)
+      : ((result.x2 - c.mu) / c.sigma).toFixed(4);
+    zStr = `±${zHalf}σ`;
+  } else {
+    const zVal = isLN
+      ? ((Math.log(Math.max(result.x1, 1e-10)) - c.mu) / c.sigma).toFixed(4)
+      : ((result.x1 - c.mu) / c.sigma).toFixed(4);
+    zStr = `${zVal}σ`;
+  }
+  document.getElementById('crZ').textContent = zStr;
+}
+
+['confPct','confDir','confXval','confDirX','confCurveSelect'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateConfPreview);
+});
+
+// Type toggle
+document.querySelectorAll('.conf-type-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.conf-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('confInputPct').style.display = btn.dataset.type === 'pct' ? '' : 'none';
+    document.getElementById('confInputX').style.display = btn.dataset.type === 'x' ? '' : 'none';
+    updateConfPreview();
+  });
+});
+
+// Quick preset buttons
+document.querySelectorAll('.conf-quick-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.getElementById('confPct').value = btn.dataset.pct;
+    updateConfPreview();
+  });
+});
+
+// Add confidence line
+document.getElementById('btnAddConfLine').addEventListener('click', () => {
+  const curveIdx = parseInt(document.getElementById('confCurveSelect').value);
+  if (isNaN(curveIdx) || !curves[curveIdx]) { showToast('Selecciona una curva de referencia'); return; }
+  const c = curves[curveIdx];
+  const curveName = c.name;
+  const dist = c.dist || 'normal';
+  const mode = document.querySelector('.conf-type-btn.active').dataset.type;
+  let result;
+  if (mode === 'pct') {
+    const pct = parseFloat(document.getElementById('confPct').value);
+    if (isNaN(pct) || pct <= 0 || pct >= 100) { showToast('Ingresa un % válido (0.1–99.9)'); return; }
+    result = computeConfFromPct(c.mu, c.sigma, pct, document.getElementById('confDir').value, dist);
+  } else {
+    const xval = parseFloat(document.getElementById('confXval').value);
+    if (isNaN(xval)) { showToast('Ingresa un valor x válido'); return; }
+    if (dist === 'lognormal' && xval <= 0) { showToast('Para Log-Normal, x debe ser > 0'); return; }
+    result = computeConfFromX(c.mu, c.sigma, xval, document.getElementById('confDirX').value, dist);
+  }
+  const color = CONF_COLORS[confColorIdx % CONF_COLORS.length]; confColorIdx++;
+  const dirLabel = { right: 'P(X>x)', left: 'P(X<x)', two: 'intervalo' }[result.dir];
+  const xLabel = result.x2 !== null
+    ? `x ∈ [${result.x1.toFixed(3)}, ${result.x2.toFixed(3)}]`
+    : `x = ${result.x1.toFixed(4)}`;
+  confLines.push({
+    curveName, mu: c.mu, sigma: c.sigma, dist,
+    x1: result.x1, x2: result.x2,
+    pct: result.pct, dir: result.dir,
+    color, _labels: [],
+    label: `${curveName} · ${dirLabel} = ${result.pct.toFixed(2)}%`,
+    xLabel
+  });
+  renderConfList();
+  renderChart();
+});
+
+function renderConfList() {
+  const el = document.getElementById('confLinesList');
+  if (!confLines.length) { el.innerHTML = ''; return; }
+  el.innerHTML = confLines.map((l, i) => `
+    <div class="conf-line-item" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div style="display:flex;align-items:center;gap:7px">
+        <div class="conf-swatch" style="background:${l.color}"></div>
+        <div class="conf-info" style="flex:1;min-width:0">
+          <div class="conf-name">${l.label}</div>
+          <div class="conf-detail">${l.xLabel}</div>
+        </div>
+        <button class="btn-conf-reset" data-i="${i}" title="Resetear posición etiqueta" style="background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:2px 4px;border-radius:5px;transition:color .12s">↺</button>
+        <button class="btn-conf-del" data-i="${i}">×</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;padding-left:2px">
+        <span style="font-size:10px;color:var(--text3);letter-spacing:.5px;text-transform:uppercase;font-weight:600;white-space:nowrap">Color</span>
+        <div style="display:flex;gap:4px;flex-wrap:wrap" id="clPalette${i}"></div>
+      </div>
+      <div style="font-size:10px;color:var(--text3);padding-left:2px">Arrastra la etiqueta en el gráfico para reposicionarla</div>
+    </div>`).join('');
+
+  const CONF_PALETTE = ['#facc15','#f472b6','#34d399','#a78bfa','#fb923c','#60a5fa','#f87171','#4ade80','#e879f9','#38bdf8'];
+  confLines.forEach((l, i) => {
+    const row = document.getElementById(`clPalette${i}`);
+    if (!row) return;
+    CONF_PALETTE.forEach(col => {
+      const d = document.createElement('div');
+      d.style.cssText = `width:16px;height:16px;border-radius:50%;background:${col};cursor:pointer;border:2px solid ${col===l.color?'#fff':'transparent'};flex-shrink:0;transition:transform .1s,border-color .1s`;
+      d.addEventListener('click', () => { confLines[i].color = col; renderConfList(); renderChart(); });
+      d.addEventListener('mouseover', () => d.style.transform = 'scale(1.2)');
+      d.addEventListener('mouseout', () => d.style.transform = 'scale(1)');
+      row.appendChild(d);
+    });
+  });
+
+  el.querySelectorAll('.btn-conf-del').forEach(btn => {
+    btn.addEventListener('click', () => { confLines.splice(+btn.dataset.i, 1); renderConfList(); renderChart(); });
+  });
+
+  el.querySelectorAll('.btn-conf-reset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const l = confLines[+btn.dataset.i];
+      if (l._labels) l._labels.forEach(s => { s.userPx = null; s.userPy = null; });
+      renderChart();
+    });
+  });
+}
+
+// Update curve selector whenever curves change
+function updateConfCurveSelect() {
+  const sel = document.getElementById('confCurveSelect');
+  const prevIdx = sel.value; // previously selected index (as string)
+  sel.innerHTML = '<option value="">— selecciona una curva —</option>' +
+    curves.map((c, i) => !c.hidden
+      ? `<option value="${i}"${String(i) === prevIdx ? ' selected' : ''}>${c.name} (μ=${c.mu}, σ=${c.sigma})</option>`
+      : ''
+    ).join('');
+  updateConfPreview();
+}
+
+// Confidence lines Canvas plugin
+// Each confLine gets a `labels` array of { xv, px (auto), userPx, userPy } after first draw
+const confPlugin = {
+  id: 'confLines',
+  afterDatasetsDraw(chartInst) {
+    if (!confLines.length) return;
+    const ctx = chartInst.ctx;
+    const xScale = chartInst.scales.x;
+    const yScale = chartInst.scales.y;
+    const top = yScale.top, bottom = yScale.bottom;
+    const chartRight = xScale.right;
+
+    const PILL_W = 18;   // pill width (it's rotated, so this is the visual height)
+    const PILL_H = 12;   // pill height (visual width after rotation)
+    const PAD    = 6;
+
+    confLines.forEach(l => {
+      const lineXs = l.x2 !== null ? [l.x1, l.x2] : [l.x1];
+      const cData = curves.find(c => c.name === l.curveName && !c.hidden);
+
+      // Ensure label slots exist
+      if (!l._labels) l._labels = [];
+      while (l._labels.length < lineXs.length) l._labels.push({});
+
+      // ── Shaded area ─────────────────────────────────────────────────────
+      if (cData) {
+        ctx.save();
+        if (l.x2 === null) {
+          const visMin = xScale.getValueForPixel(xScale.left);
+          const visMax = xScale.getValueForPixel(chartRight);
+          const sx0 = l.dir === 'right' ? l.x1 : visMin;
+          const sx1 = l.dir === 'right' ? visMax : l.x1;
+          ctx.beginPath();
+          ctx.moveTo(xScale.getPixelForValue(sx0), bottom);
+          for (let s = 0; s <= 140; s++) {
+            const sx = sx0 + (sx1 - sx0) * s / 140;
+            ctx.lineTo(xScale.getPixelForValue(sx), yScale.getPixelForValue(normalPDF(sx, cData.mu, cData.sigma)));
+          }
+          ctx.lineTo(xScale.getPixelForValue(sx1), bottom);
+          ctx.closePath();
+          ctx.fillStyle = hexToRgba(l.color, 0.11);
+          ctx.fill();
+        } else {
+          ctx.beginPath();
+          ctx.moveTo(xScale.getPixelForValue(l.x1), bottom);
+          for (let s = 0; s <= 160; s++) {
+            const sx = l.x1 + (l.x2 - l.x1) * s / 160;
+            ctx.lineTo(xScale.getPixelForValue(sx), yScale.getPixelForValue(normalPDF(sx, cData.mu, cData.sigma)));
+          }
+          ctx.lineTo(xScale.getPixelForValue(l.x2), bottom);
+          ctx.closePath();
+          ctx.fillStyle = hexToRgba(l.color, 0.11);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // ── Per-line: dashed vertical + vertical label ───────────────────────
+      lineXs.forEach((xv, li) => {
+        const px = xScale.getPixelForValue(xv);
+        if (px < xScale.left - 1 || px > chartRight + 1) return;
+
+        // Dashed vertical line
+        ctx.save();
+        ctx.beginPath();
+        ctx.setLineDash([5, 4]);
+        ctx.strokeStyle = l.color;
+        ctx.lineWidth = 1.5;
+        ctx.moveTo(px, top);
+        ctx.lineTo(px, bottom);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Label text
+        const text = l.x2 !== null
+          ? (li === 0 ? `${l.curveName}: ${l.pct.toFixed(2)}%` : `${l.curveName}: x=${xv.toFixed(2)}`)
+          : `${l.curveName}: ${l.pct.toFixed(2)}%`;
+
+        ctx.save();
+        ctx.font = `600 11px "Syne", sans-serif`;
+        const tw = ctx.measureText(text).width;
+        ctx.restore();
+
+        const slot = l._labels[li];
+
+        // Default position: along the line, vertically centered, just to the right
+        if (slot.userPx === undefined) {
+          slot.autoPx = px + PILL_W / 2 + 4;
+          slot.autoPy = top + tw / 2 + PAD + li * (tw + PAD * 3 + 10);
+          slot.userPx = null;
+          slot.userPy = null;
+        } else {
+          // Keep autoPx in sync with line (only if user hasn't dragged)
+          if (slot.userPx === null) slot.autoPx = px + PILL_W / 2 + 4;
+        }
+
+        const labelCX = slot.userPx !== null ? slot.userPx : slot.autoPx;
+        const labelCY = slot.userPy !== null ? slot.userPy : slot.autoPy;
+
+        // Connector line from dashed-line edge to label center
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = hexToRgba(l.color, 0.4);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 3]);
+        ctx.moveTo(px, labelCY);
+        ctx.lineTo(labelCX - PILL_W / 2, labelCY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.restore();
+
+        // Draw rotated pill + text
+        ctx.save();
+        ctx.translate(labelCX, labelCY);
+        ctx.rotate(-Math.PI / 2);
+
+        const bw = tw + PAD * 2;
+        const bh = PILL_W;
+
+        // pill bg
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(-bw / 2, -bh / 2, bw, bh, 5);
+        else ctx.rect(-bw / 2, -bh / 2, bw, bh);
+        ctx.fillStyle = hexToRgba(l.color, 0.18);
+        ctx.fill();
+        ctx.strokeStyle = l.color;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+
+        // text (unrotated relative to pill center)
+        ctx.fillStyle = '#f0f0f4';
+        ctx.font = `600 11px "Syne", sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 0, 0);
+
+        ctx.restore();
+
+        // Store bounding info for drag hit-test
+        slot.cx = labelCX;
+        slot.cy = labelCY;
+        slot.hw = PILL_W / 2 + 3;   // half-width after rotation = half pill height
+        slot.hh = tw / 2 + PAD + 2; // half-height after rotation = half pill width
+        slot.lineIdx = confLines.indexOf(l);
+        slot.subIdx = li;
+      });
+    });
+  }
+};
+
+// ─── DATA MODAL ─────────────────────────────────────────────────────────────
+let dataModalValues = [];   // raw numeric values
+let dataModalDist   = 'normal';
+let dataModalEditCurveIdx = null; // null = new curve, number = editing existing
+
+const dataModal = document.getElementById('dataModal');
+
+function openDataModal(editIdx) {
+  dataModalEditCurveIdx = editIdx !== undefined ? editIdx : null;
+  if (dataModalEditCurveIdx !== null) {
+    const c = curves[dataModalEditCurveIdx];
+    document.getElementById('dataModalTitle').textContent = `Editar datos — ${c.name}`;
+    dataModalValues = (c.rawData || []).slice();
+    dataModalDist = c.dist || 'normal';
+  } else {
+    document.getElementById('dataModalTitle').textContent = 'Datos desde Excel';
+    dataModalValues = [];
+    dataModalDist = selectedDist;
+  }
+  // sync dist buttons
+  document.getElementById('ddNormal').classList.toggle('active', dataModalDist === 'normal');
+  document.getElementById('ddLogNormal').classList.toggle('active', dataModalDist === 'lognormal');
+
+  switchDataTab(dataModalValues.length ? 'edit' : 'paste');
+  if (dataModalValues.length) buildEditTable();
+  refreshDataStats();
+  dataModal.classList.add('open');
+}
+function closeDataModal() { dataModal.classList.remove('open'); }
+
+dataModal.addEventListener('click', e => { if (e.target === dataModal) closeDataModal(); });
+document.getElementById('dataModalClose').addEventListener('click', closeDataModal);
+document.getElementById('btnDataCancel').addEventListener('click', closeDataModal);
+document.getElementById('btnOpenData').addEventListener('click', () => openDataModal());
+
+function switchDataTab(name) {
+  document.querySelectorAll('.data-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === name));
+  document.querySelectorAll('.data-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('dp' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  if (name === 'stats') buildFullStats();
+  if (name === 'edit') buildEditTable();
+}
+document.querySelectorAll('.data-tab').forEach(t => {
+  t.addEventListener('click', () => switchDataTab(t.dataset.dtab));
+});
+
+// Dist type toggle in modal
+document.getElementById('ddNormal').addEventListener('click', () => {
+  dataModalDist = 'normal';
+  document.getElementById('ddNormal').classList.add('active');
+  document.getElementById('ddLogNormal').classList.remove('active');
+  refreshDataStats();
+});
+document.getElementById('ddLogNormal').addEventListener('click', () => {
+  dataModalDist = 'lognormal';
+  document.getElementById('ddLogNormal').classList.add('active');
+  document.getElementById('ddNormal').classList.remove('active');
+  refreshDataStats();
+});
+
+// ── Parse paste ─────────────────────────────────────────────────────────────
+function parsePaste(text) {
+  // Split by newlines, then by tab / comma / semicolon / space
+  const tokens = text.trim().split(/\r?\n/).flatMap(row =>
+    row.split(/[\t,;]+/).map(t => t.trim().replace(',', '.'))
+  ).filter(t => t !== '');
+  const nums = tokens.map(t => parseFloat(t.replace(/[^\d.\-eE]/g, '')));
+  return nums.filter(n => !isNaN(n));
+}
+
+document.getElementById('dataPasteArea').addEventListener('input', () => {
+  const vals = parsePaste(document.getElementById('dataPasteArea').value);
+  if (!vals.length) {
+    document.getElementById('dataPastePreview').style.display = 'none';
+    return;
+  }
+  document.getElementById('dataPastePreview').style.display = 'grid';
+  const stats = computeStats(vals, dataModalDist);
+  document.getElementById('dpN').textContent = vals.length;
+  document.getElementById('dpMean').textContent = stats.mu.toFixed(4);
+  document.getElementById('dpStd').textContent = stats.sigma.toFixed(4);
+  document.getElementById('dpType').textContent = dataModalDist === 'lognormal' ? 'Log-N' : 'Normal';
+});
+
+document.getElementById('btnDataParse').addEventListener('click', () => {
+  const vals = parsePaste(document.getElementById('dataPasteArea').value);
+  if (!vals.length) {
+    showDataWarn('dataPasteWarn', 'No se encontraron valores numéricos válidos.');
+    return;
+  }
+  if (dataModalDist === 'lognormal' && vals.some(v => v <= 0)) {
+    showDataWarn('dataPasteWarn', 'Log-Normal requiere valores > 0. Se ignorarán los valores ≤ 0.');
+  } else {
+    hideDataWarn('dataPasteWarn');
+  }
+  dataModalValues = dataModalDist === 'lognormal' ? vals.filter(v => v > 0) : vals;
+  buildEditTable();
+  refreshDataStats();
+  switchDataTab('edit');
+});
+
+document.getElementById('btnDataClear').addEventListener('click', () => {
+  document.getElementById('dataPasteArea').value = '';
+  document.getElementById('dataPastePreview').style.display = 'none';
+  hideDataWarn('dataPasteWarn');
+});
+
+// ── Edit table ───────────────────────────────────────────────────────────────
+function buildEditTable() {
+  const tbody = document.getElementById('dataEditBody');
+  tbody.innerHTML = '';
+  dataModalValues.forEach((v, i) => {
+    const tr = document.createElement('tr');
+    tr.dataset.i = i;
+    const lnVal = v > 0 ? Math.log(v).toFixed(5) : 'N/A';
+    tr.innerHTML = `
+      <td style="color:var(--text3);width:36px">${i+1}</td>
+      <td><input type="number" class="de-val" data-i="${i}" value="${v}" step="any" /></td>
+      <td style="color:var(--text3)">${lnVal}</td>
+      <td class="td-del"><button data-i="${i}">×</button></td>`;
+    tbody.appendChild(tr);
+  });
+  bindEditTableEvents();
+  refreshEditStats();
+}
+
+function bindEditTableEvents() {
+  const tbody = document.getElementById('dataEditBody');
+  tbody.querySelectorAll('.de-val').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const i = +inp.dataset.i;
+      const v = parseFloat(inp.value);
+      if (!isNaN(v)) {
+        dataModalValues[i] = v;
+        // update ln cell
+        const tr = inp.closest('tr');
+        tr.cells[2].textContent = v > 0 ? Math.log(v).toFixed(5) : 'N/A';
+      }
+      refreshEditStats();
+    });
+  });
+  tbody.querySelectorAll('.td-del button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      dataModalValues.splice(+btn.dataset.i, 1);
+      buildEditTable();
+      refreshDataStats();
+    });
+  });
+}
+
+document.getElementById('btnAddDataRow').addEventListener('click', () => {
+  dataModalValues.push(0);
+  buildEditTable();
+  // focus last input
+  const inputs = document.querySelectorAll('.de-val');
+  if (inputs.length) inputs[inputs.length-1].focus();
+});
+
+// ── Stats computations ────────────────────────────────────────────────────────
+function computeStats(vals, dist) {
+  const n = vals.length;
+  if (!n) return { mu: 0, sigma: 1, n: 0 };
+
+  let workVals = vals;
+  if (dist === 'lognormal') {
+    workVals = vals.filter(v => v > 0).map(v => Math.log(v));
+  }
+
+  const mu = workVals.reduce((a, b) => a + b, 0) / workVals.length;
+  const variance = workVals.reduce((a, v) => a + (v - mu) ** 2, 0) / (workVals.length > 1 ? workVals.length - 1 : 1);
+  const sigma = Math.sqrt(variance);
+  return { mu, sigma, n: workVals.length };
+}
+
+function computeFullStats(vals, dist) {
+  const n = vals.length;
+  if (!n) return {};
+  const sorted = [...vals].sort((a, b) => a - b);
+  const rawMean = vals.reduce((a, b) => a + b, 0) / n;
+  const rawVar  = vals.reduce((a, v) => a + (v - rawMean) ** 2, 0) / (n > 1 ? n - 1 : 1);
+
+  const stats = computeStats(vals, dist);
+  return {
+    n,
+    rawMean, rawStd: Math.sqrt(rawVar),
+    mu: stats.mu, sigma: stats.sigma,
+    min: sorted[0], max: sorted[n-1],
+    median: n % 2 === 0 ? (sorted[n/2-1] + sorted[n/2]) / 2 : sorted[Math.floor(n/2)],
+    q1: sorted[Math.floor(n * 0.25)],
+    q3: sorted[Math.floor(n * 0.75)],
+  };
+}
+
+function refreshDataStats() {
+  if (!dataModalValues.length) return;
+  const s = computeStats(dataModalValues, dataModalDist);
+  refreshEditStats(s);
+}
+
+function refreshEditStats(s) {
+  if (!s) s = computeStats(dataModalValues, dataModalDist);
+  document.getElementById('deMean').textContent = s.mu.toFixed(5);
+  document.getElementById('deStd').textContent  = s.sigma.toFixed(5);
+  document.getElementById('deN').textContent    = s.n;
+}
+
+function buildFullStats() {
+  if (!dataModalValues.length) return;
+  const s = computeFullStats(dataModalValues, dataModalDist);
+  const el = document.getElementById('dsFullStats');
+  const fmt = v => (typeof v === 'number' ? v.toFixed(4) : '—');
+  const cards = [
+    ['N', s.n], ['Media (x̄)', fmt(s.rawMean)], ['Desv. Est. (s)', fmt(s.rawStd)],
+    ['Mínimo', fmt(s.min)], ['Máximo', fmt(s.max)], ['Mediana', fmt(s.median)],
+    ['Q1', fmt(s.q1)], ['Q3', fmt(s.q3)],
+    ...(dataModalDist === 'lognormal' ? [['μ (log)', fmt(s.mu)], ['σ (log)', fmt(s.sigma)]] : [['μ', fmt(s.mu)], ['σ', fmt(s.sigma)]])
+  ];
+  el.style.gridTemplateColumns = 'repeat(3,1fr)';
+  el.innerHTML = cards.map(([l, v]) =>
+    `<div class="data-stat-card"><div class="data-stat-label">${l}</div><div class="data-stat-val">${v}</div></div>`
+  ).join('');
+
+  const warnEl = document.getElementById('dsLognormWarn');
+  if (dataModalDist === 'lognormal' && dataModalValues.some(v => v <= 0)) {
+    warnEl.textContent = `⚠ ${dataModalValues.filter(v => v <= 0).length} valores ≤ 0 se excluyen del cálculo log-normal.`;
+    warnEl.classList.add('show');
+  } else {
+    warnEl.classList.remove('show');
+  }
+}
+
+function showDataWarn(id, msg) {
+  const el = document.getElementById(id);
+  el.textContent = msg; el.classList.add('show');
+}
+function hideDataWarn(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// ── Apply / create curve ────────────────────────────────────────────────────
+document.getElementById('btnDataApply').addEventListener('click', () => {
+  const vals = dataModalDist === 'lognormal'
+    ? dataModalValues.filter(v => v > 0)
+    : dataModalValues;
+  if (!vals.length) { showToast('Sin datos válidos para calcular'); return; }
+
+  const stats = computeStats(vals, dataModalDist);
+
+  if (dataModalEditCurveIdx !== null) {
+    // Editing an existing curve
+    const c = curves[dataModalEditCurveIdx];
+    curves[dataModalEditCurveIdx] = {
+      ...c,
+      mu: +stats.mu.toFixed(6), sigma: +stats.sigma.toFixed(6),
+      dist: dataModalDist,
+      rawData: dataModalValues.slice(),
+      labelX: undefined, labelY: undefined
+    };
+    renderList(); renderChart();
+    showToast(`Datos actualizados — ${stats.n} valores`);
+  } else {
+    // New curve
+    const name = document.getElementById('iName').value.trim() ||
+      `Muestra ${String.fromCharCode(64 + sampleCounter)}`;
+    curves.push({
+      name, color: selectedColor, dist: dataModalDist,
+      mu: +stats.mu.toFixed(6), sigma: +stats.sigma.toFixed(6),
+      rawData: dataModalValues.slice(),
+      hidden: false, showLabel: false
+    });
+    sampleCounter++;
+    document.getElementById('iName').value = '';
+    // advance color
+    const idx = PALETTE.indexOf(selectedColor);
+    selectedColor = PALETTE[(idx + 1) % PALETTE.length];
+    buildColorPicker();
+    renderList(); renderChart();
+    showToast(`Campana creada — ${stats.n} valores, μ=${stats.mu.toFixed(4)}, σ=${stats.sigma.toFixed(4)}`);
+  }
+  closeDataModal();
+});
+
+// ─── INIT CHART ────────────────────────────────────────────────────────────
+renderChart();
+
+// ─── JSON MODAL ────────────────────────────────────────────────────────────
+const jsonModal = document.getElementById('jsonModal');
+
+function openModal(tab) {
+  jsonModal.classList.add('open');
+  switchTab(tab || 'export');
+  if (!tab || tab === 'export') refreshExport();
+}
+function closeModal() { jsonModal.classList.remove('open'); }
+
+function switchTab(name) {
+  document.querySelectorAll('.modal-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.getElementById('panelExport').classList.toggle('active', name === 'export');
+  document.getElementById('panelImport').classList.toggle('active', name === 'import');
+}
+
+function refreshExport() {
+  const title = document.getElementById('chartTitleMain').value;
+  const data = {
+    title,
+    curves: curves.map(c => ({
+      name: c.name, mu: c.mu, sigma: c.sigma, color: c.color,
+      dist: c.dist || 'normal',
+      hidden: c.hidden || false,
+      showLabel: c.showLabel || false,
+      labelX: c.labelX !== undefined ? c.labelX : null,
+      labelY: c.labelY !== undefined ? c.labelY : null,
+      rawData: c.rawData ? c.rawData : null
+    })),
+    confLines: confLines.map(l => ({
+      curveName: l.curveName,
+      mu: l.mu, sigma: l.sigma,
+      dist: l.dist || 'normal',
+      x1: l.x1, x2: l.x2 !== undefined ? l.x2 : null,
+      pct: l.pct, dir: l.dir,
+      color: l.color,
+      label: l.label, xLabel: l.xLabel,
+      labels: (l._labels || []).map(s => ({
+        userPx: s.userPx !== undefined ? s.userPx : null,
+        userPy: s.userPy !== undefined ? s.userPy : null
+      }))
+    }))
+  };
+  document.getElementById('jsonExportArea').value = JSON.stringify(data, null, 2);
+}
+
+document.getElementById('btnJsonModal').addEventListener('click', () => openModal('export'));
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('modalCancel').addEventListener('click', closeModal);
+jsonModal.addEventListener('click', e => { if (e.target === jsonModal) closeModal(); });
+
+document.querySelectorAll('.modal-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    switchTab(tab.dataset.tab);
+    if (tab.dataset.tab === 'export') refreshExport();
+  });
+});
+
+document.getElementById('btnCopyJson').addEventListener('click', () => {
+  const ta = document.getElementById('jsonExportArea');
+  navigator.clipboard.writeText(ta.value).then(() => showToast('JSON copiado al portapapeles'));
+});
+
+document.getElementById('btnDownloadJson').addEventListener('click', () => {
+  const blob = new Blob([document.getElementById('jsonExportArea').value], {type: 'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'gausscope-data.json'; a.click();
+});
+
+function applyImport(text) {
+  try {
+    const raw = JSON.parse(text);
+    const list = Array.isArray(raw) ? raw : (raw.curves || []);
+    const title = raw.title || null;
+    if (!list.length) throw new Error('Sin curvas');
+
+    const imported = list.map((c, i) => ({
+      name: c.name || `Muestra ${i+1}`,
+      mu: +c.mu, sigma: +c.sigma,
+      color: c.color || PALETTE[i % PALETTE.length],
+      dist: c.dist === 'lognormal' ? 'lognormal' : 'normal',
+      hidden: c.hidden || false,
+      showLabel: c.showLabel || false,
+      labelX: (c.labelX !== null && c.labelX !== undefined) ? +c.labelX : undefined,
+      labelY: (c.labelY !== null && c.labelY !== undefined) ? +c.labelY : undefined,
+      rawData: Array.isArray(c.rawData) ? c.rawData.map(Number) : null
+    }));
+    imported.forEach(c => { if (isNaN(c.mu) || isNaN(c.sigma) || c.sigma <= 0) throw new Error(`σ inválida en "${c.name}"`); });
+    curves = imported;
+    sampleCounter = curves.length + 1;
+
+    // Restore conf lines
+    if (Array.isArray(raw.confLines) && raw.confLines.length) {
+      confLines = raw.confLines.map(l => ({
+        curveName: l.curveName,
+        mu: +l.mu, sigma: +l.sigma,
+        dist: l.dist === 'lognormal' ? 'lognormal' : 'normal',
+        x1: +l.x1, x2: (l.x2 !== null && l.x2 !== undefined) ? +l.x2 : null,
+        pct: +l.pct, dir: l.dir,
+        color: l.color || '#facc15',
+        label: l.label || '', xLabel: l.xLabel || '',
+        _labels: (l.labels || []).map(s => ({
+          userPx: (s.userPx !== null && s.userPx !== undefined) ? +s.userPx : null,
+          userPy: (s.userPy !== null && s.userPy !== undefined) ? +s.userPy : null
+        }))
+      }));
+      confColorIdx = confLines.length;
+    } else {
+      confLines = [];
+      confColorIdx = 0;
+    }
+
+    if (title) {
+      document.getElementById('chartTitleMain').value = title;
+      document.getElementById('sTitleInput').value = title;
+    }
+
+    renderList();
+    renderConfList();
+    renderChart();
+    closeModal();
+    const n = curves.length;
+    const nc = confLines.length;
+    showToast(`${n} curva${n!==1?'s':''} y ${nc} línea${nc!==1?'s':''} de confianza importada${n!==1?'s':''}`);
+  } catch(e) {
+    showToast('Error en JSON: ' + e.message);
+  }
+}
+
+document.getElementById('btnApplyImport').addEventListener('click', () => {
+  applyImport(document.getElementById('jsonImportArea').value.trim());
+});
+
+document.getElementById('btnImportFile').addEventListener('click', () => {
+  document.getElementById('fileInput').click();
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('jsonImportArea').value = ev.target.result;
+    switchTab('import');
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+// drag-and-drop onto import textarea
+const importArea = document.getElementById('jsonImportArea');
+importArea.addEventListener('dragover', e => { e.preventDefault(); importArea.style.borderColor = 'var(--accent)'; });
+importArea.addEventListener('dragleave', () => { importArea.style.borderColor = ''; });
+importArea.addEventListener('drop', e => {
+  e.preventDefault(); importArea.style.borderColor = '';
+  const file = e.dataTransfer.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => { importArea.value = ev.target.result; };
+  reader.readAsText(file);
+});
+</script>
+</body>
+</html>
