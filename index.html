@@ -503,6 +503,76 @@
     .sidebar { position: static; height: auto; }
     .canvas-area { padding: 20px 16px; }
   }
+  /* ─── ESTUDIO DE GALVANIZADO ─── */
+  .study-badge {
+    font-size: 11px; font-family: var(--font-mono);
+    background: rgba(96,165,250,0.12); color: #60a5fa;
+    border: 1px solid rgba(96,165,250,0.3);
+    padding: 3px 10px; border-radius: 20px;
+    display: none;
+  }
+  .study-badge.on { display: inline-block; }
+  .btn-study {
+    width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: rgba(96,165,250,0.12); color: #60a5fa;
+    border: 1px solid rgba(96,165,250,0.35);
+    border-radius: var(--r); padding: 11px;
+    font-family: var(--font-ui); font-weight: 600; font-size: 13px;
+    cursor: pointer; transition: all .15s; margin-bottom: 14px;
+  }
+  .btn-study:hover { background: rgba(96,165,250,0.22); }
+  .btn-study.secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); }
+  .btn-study.secondary:hover { background: var(--bg4); }
+  .btn-study.danger { background: rgba(255,94,94,0.08); color: var(--red); border-color: rgba(255,94,94,0.3); }
+  .thr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .thr-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--font-mono); font-size: 12px;
+    padding: 4px 8px 4px 10px; border-radius: 20px;
+    border: 1px solid; cursor: default;
+  }
+  .thr-chip button {
+    background: none; border: none; color: inherit; opacity: .6;
+    cursor: pointer; font-size: 13px; line-height: 1; padding: 0;
+  }
+  .thr-chip button:hover { opacity: 1; }
+  .thr-add-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .thr-add-row input {
+    flex: 1; min-width: 0;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: var(--r); color: var(--text);
+    font-family: var(--font-mono); font-size: 13px; padding: 8px 10px; outline: none;
+  }
+  .thr-add-row input:focus { border-color: #60a5fa; }
+  .thr-add-row button {
+    background: var(--bg3); border: 1px solid var(--border2); color: var(--text);
+    border-radius: var(--r); padding: 0 14px; cursor: pointer; font-size: 16px;
+  }
+  .thr-add-row button:hover { border-color: #60a5fa; color: #60a5fa; }
+
+  .study-results {
+    border: 1px solid var(--border); border-radius: var(--r2);
+    background: var(--bg2); padding: 18px 20px; margin-top: 18px;
+  }
+  .study-results-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .study-results-title { font-family: var(--font-display); font-size: 17px; color: var(--text); }
+  .study-results-sub { font-size: 11px; color: var(--text3); font-family: var(--font-mono); }
+  .study-results-head .sep { flex: 1; }
+  table.study-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 13px; }
+  table.study-table th, table.study-table td {
+    border: 1px solid var(--border2); padding: 8px 12px; text-align: center;
+  }
+  table.study-table th { background: var(--bg3); color: var(--text2); font-weight: 500; font-size: 12px; }
+  table.study-table td.piece { font-weight: 500; color: var(--text); background: var(--bg3); }
+  table.study-table td.val { cursor: pointer; }
+  table.study-table td.val:hover { outline: 1px solid #60a5fa; }
+  table.study-table tr.worst td { background: rgba(244,114,182,0.10); }
+  table.study-table tr.worst td.piece { background: rgba(244,114,182,0.16); }
+  .pct-ok   { color: #34d399; }
+  .pct-warn { color: #facc15; }
+  .pct-bad  { color: #ff5e5e; }
+  .pct-off  { color: var(--text3); }
+  .study-hint { font-size: 11px; color: var(--text3); margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -512,6 +582,7 @@
   <header class="topbar">
     <div class="topbar-logo">GausScope <span>v2.0</span></div>
     <div class="topbar-sep"></div>
+    <div class="study-badge" id="studyBadge">⛨ Estudio de galvanizado activo</div>
     <div class="topbar-badge" id="curveCount">0 distribuciones</div>
   </header>
 
@@ -519,6 +590,40 @@
 
     <!-- SIDEBAR -->
     <aside class="sidebar">
+
+      <!-- ESTUDIO DE GALVANIZADO -->
+      <div class="sidebar-section">
+        <div class="sidebar-label">Estudio de Galvanizado</div>
+
+        <div id="studyOff">
+          <button class="btn-study" id="btnStartStudy">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1l5 2v4c0 3-2.2 5.2-5 6-2.8-.8-5-3-5-6V3l5-2z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+            Iniciar estudio de galvanizado
+          </button>
+        </div>
+
+        <div id="studyOn" style="display:none">
+          <div class="field">
+            <label>Nombre del estudio</label>
+            <input type="text" id="studyName" placeholder="ej. Estructuras mayores — Columnas" />
+          </div>
+          <div class="sidebar-label" style="margin-top:14px;text-transform:none;letter-spacing:1px">Umbrales de espesor (µm)</div>
+          <div class="thr-chips" id="thrChips"></div>
+          <div class="thr-add-row">
+            <input type="number" id="thrInput" placeholder="ej. 85" step="1" min="1" />
+            <button id="btnAddThr" title="Agregar umbral">+</button>
+          </div>
+          <button class="btn-study" id="btnSaveStudy">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M3.5 6L7 9.5 10.5 6M1.5 12.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Guardar estudio (.json)
+          </button>
+          <button class="btn-study secondary" id="btnLoadStudy" style="margin-top:-8px">
+            <input type="file" id="studyFileInput" accept=".json" style="display:none" />
+            Cargar estudio (.json)
+          </button>
+          <button class="btn-study danger" id="btnEndStudy" style="margin-top:-8px">Finalizar estudio</button>
+        </div>
+      </div>
 
       <!-- ADD FORM -->
       <div class="sidebar-section">
@@ -659,6 +764,10 @@
           <div class="chart-subtitle" id="chartSubtitle">Sin datos — agrega una distribución para comenzar</div>
         </div>
         <div class="chart-actions">
+          <button class="btn-icon" id="btnPresent">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 1h4v4M5 12H1V8M12 1L7.5 5.5M1 12l4.5-4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Vista informe
+          </button>
           <button class="btn-icon" id="btnJsonModal">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="1" y="1" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M4 4.5h5M4 6.5h5M4 8.5h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             JSON
@@ -680,6 +789,25 @@
           <canvas id="gcChart" role="img" aria-label="Gráfico de campanas de Gauss"></canvas>
         </div>
         <div class="legend-bar" id="legend"></div>
+      </div>
+
+      <!-- RESULTADOS DEL ESTUDIO -->
+      <div class="study-results" id="studyResults" style="display:none">
+        <div class="study-results-head">
+          <div>
+            <div class="study-results-title" id="studyResultsTitle">Resultados del estudio</div>
+            <div class="study-results-sub">% de superficie con espesor ≥ umbral (área bajo la curva a la derecha del umbral)</div>
+          </div>
+          <div class="sep"></div>
+          <button class="btn-icon" id="btnCopyTable">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="3.5" y="3.5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M9.5 3.5v-1A1.5 1.5 0 0 0 8 1H2.5A1.5 1.5 0 0 0 1 2.5V8a1.5 1.5 0 0 0 1.5 1.5h1" stroke="currentColor" stroke-width="1.4"/></svg>
+            Copiar tabla
+          </button>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="study-table" id="studyTable"></table>
+        </div>
+        <div class="study-hint">Haz clic en una celda para marcarla como no aplicable (“--”), por ejemplo cuando el umbral no corresponde al espesor de la pieza según ASTM A123. La fila resaltada indica la pieza con menor cumplimiento.</div>
       </div>
 
       <!-- FORMULA -->
@@ -819,6 +947,24 @@
   </div>
 </div>
 
+<!-- MODAL VISTA INFORME -->
+<div class="modal-backdrop" id="presentModal">
+  <div class="modal" style="width:1060px;max-width:96vw">
+    <div class="modal-header">
+      <span class="modal-title" id="presentTitle">Vista para informe</span>
+      <button class="modal-close" id="presentClose">×</button>
+    </div>
+    <div style="overflow-y:auto;display:flex;flex-direction:column;gap:14px;min-height:0">
+      <img id="presentImg" alt="Gráfico de distribuciones" style="width:100%;border:1px solid var(--border);border-radius:12px;background:#0a0b0f;display:block" />
+      <div id="presentTableWrap" style="overflow-x:auto"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn-modal-secondary" id="presentCopyTable">Copiar tabla</button>
+      <button class="btn-modal-primary" id="presentPng">Descargar PNG del gráfico</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="overlay-msg" id="toast"></div>
 
@@ -830,6 +976,7 @@ const PALETTE = [
 ];
 let selectedColor = PALETTE[0];
 let curves = [];
+let study = null; // { name, thresholds: [µm...], excluded: ["Pieza|umbral", ...] }
 let chart = null;
 let sampleCounter = 1;
 
@@ -1043,6 +1190,10 @@ function getXRange() {
   if (!visible.length) return { min: -5, max: 5 };
   let lo = Math.min(...visible.map(c => getCurveXRange(c).lo));
   let hi = Math.max(...visible.map(c => getCurveXRange(c).hi));
+  if (study && study.thresholds.length) {
+    lo = Math.min(lo, Math.min(...study.thresholds) - 5);
+    hi = Math.max(hi, Math.max(...study.thresholds) + 5);
+  }
   const pad = (hi - lo) * 0.06;
   return { min: lo - pad, max: hi + pad };
 }
@@ -1085,12 +1236,13 @@ function renderChart() {
     chart.options.plugins.title.text = title;
     chart.options.scales.x.min = min;
     chart.options.scales.x.max = max;
+    chart.options.scales.x.title.text = study ? 'Capa de galvanizado (µm)' : 'x';
     chart.update('active');
   } else {
     chart = new Chart(ctx, {
       type: 'line',
       data: { datasets: ds },
-      plugins: [labelPlugin, confPlugin],
+      plugins: [labelPlugin, confPlugin, thresholdPlugin],
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -1128,7 +1280,7 @@ function renderChart() {
               maxTicksLimit: 12,
               callback: v => v.toFixed(1)
             },
-            title: { display: true, text: 'x', color: '#5a5b6a', font: { family: 'DM Mono', size: 12 } }
+            title: { display: true, text: study ? 'Capa de galvanizado (µm)' : 'x', color: '#5a5b6a', font: { family: 'DM Mono', size: 12 } }
           },
           y: {
             grid: { color: 'rgba(255,255,255,0.04)' },
@@ -1152,6 +1304,7 @@ function renderChart() {
   updateStats();
   updateCount();
   updateConfCurveSelect();
+  renderStudyTable();
 }
 
 function renderLegend() {
@@ -1841,6 +1994,323 @@ const confPlugin = {
   }
 };
 
+// ─── ESTUDIO DE GALVANIZADO ─────────────────────────────────────────────────
+const THR_COLORS = ['#8b9aff', '#f472b6', '#facc15', '#34d399', '#fb923c', '#60a5fa'];
+
+const thresholdPlugin = {
+  id: 'studyThresholds',
+  afterDatasetsDraw(chartInst) {
+    if (!study || !study.thresholds.length) return;
+    const ctx = chartInst.ctx;
+    const xScale = chartInst.scales.x;
+    const yScale = chartInst.scales.y;
+    const sorted = [...study.thresholds].sort((a,b)=>a-b);
+
+    ctx.save();
+    ctx.font = `600 11px "Syne", sans-serif`;
+
+    // Precompute visible labels
+    const labels = [];
+    sorted.forEach((t, i) => {
+      const px = xScale.getPixelForValue(t);
+      if (px < xScale.left - 1 || px > xScale.right + 1) return;
+      const text = `${t} µm`;
+      const bw = ctx.measureText(text).width + 16;
+      labels.push({ t, px, text, bw, color: THR_COLORS[i % THR_COLORS.length] });
+    });
+
+    // Dashed vertical lines
+    labels.forEach(l => {
+      ctx.beginPath();
+      ctx.setLineDash([6, 5]);
+      ctx.strokeStyle = l.color;
+      ctx.lineWidth = 1.6;
+      ctx.moveTo(l.px, yScale.top);
+      ctx.lineTo(l.px, yScale.bottom);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    });
+
+    // Pills: pack into rows at the top, dropping to the next row
+    // only when a label would overlap the previous one in that row.
+    const bh = 20, vGap = 4, hGap = 6;
+    const rowsRight = []; // right edge occupied per row
+    labels.forEach(l => {
+      const left = l.px - l.bw / 2;
+      let row = 0;
+      while (row < rowsRight.length && left < rowsRight[row] + hGap) row++;
+      rowsRight[row] = l.px + l.bw / 2;
+      const by = yScale.top + 4 + row * (bh + vGap);
+
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(left, by, l.bw, bh, 6);
+      else ctx.rect(left, by, l.bw, bh);
+      ctx.fillStyle = '#14151c';              // solid bg so nothing shows through
+      ctx.fill();
+      ctx.fillStyle = hexToRgba(l.color, 0.16); // colored tint on top
+      ctx.fill();
+      ctx.strokeStyle = l.color;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.fillStyle = '#f0f0f4';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(l.text, l.px, by + bh / 2 + 0.5);
+    });
+
+    ctx.restore();
+  }
+};
+
+// % de superficie con espesor ≥ t  →  P(X ≥ t)
+function pctAboveThreshold(c, t) {
+  if ((c.dist || 'normal') === 'lognormal') {
+    if (t <= 0) return 100;
+    return (1 - normalCDF(Math.log(t), c.mu, c.sigma)) * 100;
+  }
+  return (1 - normalCDF(t, c.mu, c.sigma)) * 100;
+}
+
+function exclKey(name, t) { return `${name}|${t}`; }
+
+function pctClass(p) {
+  if (p >= 95) return 'pct-ok';
+  if (p >= 90) return 'pct-warn';
+  return 'pct-bad';
+}
+
+function fmtPct(p) {
+  if (p >= 99.995) return '100.00%';
+  return p.toFixed(2) + '%';
+}
+
+function renderStudyTable() {
+  const box = document.getElementById('studyResults');
+  if (!study) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+  document.getElementById('studyResultsTitle').textContent = study.name || 'Resultados del estudio';
+
+  const tbl = document.getElementById('studyTable');
+  const sorted = [...study.thresholds].sort((a,b)=>a-b);
+  if (!curves.length || !sorted.length) {
+    tbl.innerHTML = `<tr><td style="color:var(--text3);padding:14px">Agrega piezas (distribuciones) y umbrales para ver los resultados.</td></tr>`;
+    return;
+  }
+
+  // worst row = lowest minimum % among included cells
+  let worstIdx = -1, worstVal = Infinity;
+  curves.forEach((c, i) => {
+    const vals = sorted
+      .filter(t => !study.excluded.includes(exclKey(c.name, t)))
+      .map(t => pctAboveThreshold(c, t));
+    if (vals.length) {
+      const m = Math.min(...vals);
+      if (m < worstVal) { worstVal = m; worstIdx = i; }
+    }
+  });
+
+  let html = '<thead><tr><th>Pieza</th>' + sorted.map(t => `<th>${t} µm</th>`).join('') + '</tr></thead><tbody>';
+  curves.forEach((c, i) => {
+    const isWorst = i === worstIdx && curves.length > 1 && worstVal < 99.995;
+    html += `<tr${isWorst ? ' class="worst"' : ''}><td class="piece">${c.name}</td>`;
+    sorted.forEach(t => {
+      const off = study.excluded.includes(exclKey(c.name, t));
+      if (off) {
+        html += `<td class="val pct-off" data-name="${encodeURIComponent(c.name)}" data-t="${t}" title="Clic para volver a incluir">--</td>`;
+      } else {
+        const p = pctAboveThreshold(c, t);
+        html += `<td class="val ${pctClass(p)}" data-name="${encodeURIComponent(c.name)}" data-t="${t}" title="Clic para marcar como no aplicable">${fmtPct(p)}</td>`;
+      }
+    });
+    html += '</tr>';
+  });
+  html += '</tbody>';
+  tbl.innerHTML = html;
+
+  tbl.querySelectorAll('td.val').forEach(td => {
+    td.addEventListener('click', () => {
+      const key = exclKey(decodeURIComponent(td.dataset.name), +td.dataset.t);
+      const idx = study.excluded.indexOf(key);
+      if (idx >= 0) study.excluded.splice(idx, 1);
+      else study.excluded.push(key);
+      renderStudyTable();
+    });
+  });
+}
+
+function renderThrChips() {
+  const el = document.getElementById('thrChips');
+  if (!study) { el.innerHTML = ''; return; }
+  const sorted = [...study.thresholds].sort((a,b)=>a-b);
+  el.innerHTML = sorted.map((t, i) => {
+    const color = THR_COLORS[i % THR_COLORS.length];
+    return `<span class="thr-chip" style="color:${color};border-color:${hexToRgba(color,0.45)};background:${hexToRgba(color,0.12)}">${t} µm <button data-t="${t}" title="Quitar umbral">×</button></span>`;
+  }).join('');
+  el.querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      study.thresholds = study.thresholds.filter(t => t !== +b.dataset.t);
+      renderThrChips(); renderChart();
+    });
+  });
+}
+
+function syncStudyUI() {
+  const on = !!study;
+  document.getElementById('studyOff').style.display = on ? 'none' : 'block';
+  document.getElementById('studyOn').style.display = on ? 'block' : 'none';
+  document.getElementById('studyBadge').classList.toggle('on', on);
+  if (on) document.getElementById('studyName').value = study.name || '';
+  renderThrChips();
+}
+
+function startStudy() {
+  study = { name: 'Estudio de galvanizado', thresholds: [75, 85, 100], excluded: [] };
+  const titleEl = document.getElementById('chartTitleMain');
+  if (!curves.length && /Comparación de distribuciones/i.test(titleEl.value)) {
+    titleEl.value = 'Resultados del galvanizado';
+    document.getElementById('sTitleInput').value = titleEl.value;
+  }
+  syncStudyUI();
+  renderChart();
+  showToast('Estudio de galvanizado iniciado — agrega las piezas como distribuciones');
+}
+
+function endStudy() {
+  if (!confirm('¿Finalizar el estudio de galvanizado? Las curvas se conservan; se quitan los umbrales y la tabla de resultados.')) return;
+  study = null;
+  syncStudyUI();
+  renderChart();
+}
+
+function buildStudyExportObject() {
+  const title = document.getElementById('chartTitleMain').value;
+  return {
+    tipo: 'estudio-galvanizado',
+    fecha: new Date().toISOString().slice(0, 10),
+    title,
+    study: study ? { name: study.name, thresholds: [...study.thresholds].sort((a,b)=>a-b), excluded: [...study.excluded] } : null,
+    curves: curves.map(c => ({
+      name: c.name, mu: c.mu, sigma: c.sigma, color: c.color,
+      dist: c.dist || 'normal',
+      hidden: c.hidden || false,
+      showLabel: c.showLabel || false,
+      labelX: c.labelX !== undefined ? c.labelX : null,
+      labelY: c.labelY !== undefined ? c.labelY : null,
+      rawData: c.rawData ? c.rawData : null
+    })),
+    resultados: study ? curves.map(c => {
+      const fila = { pieza: c.name };
+      [...study.thresholds].sort((a,b)=>a-b).forEach(t => {
+        fila[`${t}um`] = study.excluded.includes(exclKey(c.name, t)) ? null : +pctAboveThreshold(c, t).toFixed(2);
+      });
+      return fila;
+    }) : []
+  };
+}
+
+document.getElementById('btnStartStudy').addEventListener('click', startStudy);
+document.getElementById('btnEndStudy').addEventListener('click', endStudy);
+
+document.getElementById('studyName').addEventListener('input', e => {
+  if (study) { study.name = e.target.value; renderStudyTable(); }
+});
+
+function addThresholdFromInput() {
+  const inp = document.getElementById('thrInput');
+  const v = parseFloat(inp.value);
+  if (!study || isNaN(v) || v <= 0) return;
+  if (!study.thresholds.includes(v)) study.thresholds.push(v);
+  inp.value = '';
+  renderThrChips(); renderChart();
+}
+document.getElementById('btnAddThr').addEventListener('click', addThresholdFromInput);
+document.getElementById('thrInput').addEventListener('keydown', e => { if (e.key === 'Enter') addThresholdFromInput(); });
+
+document.getElementById('btnSaveStudy').addEventListener('click', () => {
+  if (!study) return;
+  const data = buildStudyExportObject();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const safe = (study.name || 'estudio-galvanizado').toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi, '-').replace(/^-|-$/g, '');
+  a.download = `${safe || 'estudio-galvanizado'}-${data.fecha}.json`;
+  a.click();
+  showToast('Estudio guardado como .json');
+});
+
+document.getElementById('btnLoadStudy').addEventListener('click', () => {
+  document.getElementById('studyFileInput').click();
+});
+document.getElementById('studyFileInput').addEventListener('change', e => {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => applyImport(ev.target.result);
+  reader.readAsText(file);
+  e.target.value = '';
+});
+
+document.getElementById('btnCopyTable').addEventListener('click', () => {
+  if (!study) return;
+  const sorted = [...study.thresholds].sort((a,b)=>a-b);
+  let tsv = 'Pieza\t' + sorted.map(t => `${t} µm`).join('\t') + '\n';
+  curves.forEach(c => {
+    tsv += c.name + '\t' + sorted.map(t =>
+      study.excluded.includes(exclKey(c.name, t)) ? '--' : fmtPct(pctAboveThreshold(c, t))
+    ).join('\t') + '\n';
+  });
+  navigator.clipboard.writeText(tsv).then(() => showToast('Tabla copiada — pégala en Excel o Word'));
+});
+
+// ─── VISTA INFORME (modal gráfico + tabla) ──────────────────────────────────
+const presentModal = document.getElementById('presentModal');
+
+function openPresentModal() {
+  if (!chart || !curves.length) { showToast('Agrega al menos una distribución primero'); return; }
+  document.getElementById('presentTitle').textContent =
+    (study && study.name) ? study.name : (document.getElementById('chartTitleMain').value || 'Vista para informe');
+
+  // Snapshot del gráfico sobre fondo sólido (para que el PNG no quede transparente)
+  const src = document.getElementById('gcChart');
+  const snap = document.createElement('canvas');
+  snap.width = src.width; snap.height = src.height;
+  const sctx = snap.getContext('2d');
+  sctx.fillStyle = '#0a0b0f';
+  sctx.fillRect(0, 0, snap.width, snap.height);
+  sctx.drawImage(src, 0, 0);
+  document.getElementById('presentImg').src = snap.toDataURL('image/png');
+
+  // Clonar la tabla de resultados (solo lectura)
+  const wrap = document.getElementById('presentTableWrap');
+  const hasTable = !!study && !!curves.length;
+  if (hasTable) {
+    const t = document.getElementById('studyTable').cloneNode(true);
+    t.querySelectorAll('td.val').forEach(td => { td.classList.remove('val'); td.removeAttribute('title'); });
+    wrap.innerHTML = '';
+    wrap.appendChild(t);
+  } else {
+    wrap.innerHTML = '';
+  }
+  wrap.style.display = hasTable ? 'block' : 'none';
+  document.getElementById('presentCopyTable').style.display = hasTable ? 'inline-flex' : 'none';
+
+  presentModal.classList.add('open');
+}
+
+document.getElementById('btnPresent').addEventListener('click', openPresentModal);
+document.getElementById('presentClose').addEventListener('click', () => presentModal.classList.remove('open'));
+presentModal.addEventListener('click', e => { if (e.target === presentModal) presentModal.classList.remove('open'); });
+
+document.getElementById('presentPng').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.download = ((study && study.name) ? study.name.toLowerCase().replace(/[^a-z0-9áéíóúñ]+/gi,'-').replace(/^-|-$/g,'') : 'gausscope') + '.png';
+  a.href = document.getElementById('presentImg').src;
+  a.click();
+});
+
+document.getElementById('presentCopyTable').addEventListener('click', () => {
+  document.getElementById('btnCopyTable').click();
+});
+
 // ─── DATA MODAL ─────────────────────────────────────────────────────────────
 let dataModalValues = [];   // raw numeric values
 let dataModalDist   = 'normal';
@@ -2146,6 +2616,7 @@ function refreshExport() {
   const title = document.getElementById('chartTitleMain').value;
   const data = {
     title,
+    study: study ? { name: study.name, thresholds: [...study.thresholds].sort((a,b)=>a-b), excluded: [...study.excluded] } : null,
     curves: curves.map(c => ({
       name: c.name, mu: c.mu, sigma: c.sigma, color: c.color,
       dist: c.dist || 'normal',
@@ -2200,7 +2671,7 @@ function applyImport(text) {
     const raw = JSON.parse(text);
     const list = Array.isArray(raw) ? raw : (raw.curves || []);
     const title = raw.title || null;
-    if (!list.length) throw new Error('Sin curvas');
+    if (!list.length && !raw.study) throw new Error('Sin curvas');
 
     const imported = list.map((c, i) => ({
       name: c.name || `Muestra ${i+1}`,
@@ -2242,6 +2713,18 @@ function applyImport(text) {
       document.getElementById('chartTitleMain').value = title;
       document.getElementById('sTitleInput').value = title;
     }
+
+    // Restore galvanizado study
+    if (raw.study && Array.isArray(raw.study.thresholds)) {
+      study = {
+        name: raw.study.name || 'Estudio de galvanizado',
+        thresholds: raw.study.thresholds.map(Number).filter(t => !isNaN(t) && t > 0),
+        excluded: Array.isArray(raw.study.excluded) ? raw.study.excluded.map(String) : []
+      };
+    } else {
+      study = null;
+    }
+    syncStudyUI();
 
     renderList();
     renderConfList();
